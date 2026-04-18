@@ -16,6 +16,17 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Environment Variables
+
+Create a `.env.local` file in the project root and add:
+
+```bash
+MONGO_URI=your_mongodb_connection_string
+GMAIL_APP_PASSWORD=your_gmail_app_password
+```
+
+`GMAIL_APP_PASSWORD` is used for OTP email sending from `resihubproject@gmail.com` via Nodemailer.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

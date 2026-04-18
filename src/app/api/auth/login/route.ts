@@ -36,6 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!user.isEmailVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Please verify your email with OTP before logging in",
+        },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: true,

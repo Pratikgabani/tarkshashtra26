@@ -17,6 +17,8 @@ interface FormState {
   batch: string;
 }
 
+type SignupStep = 1 | 2 | 3;
+
 const DEPARTMENTS = [
   "Computer Engineering",
   "Mechanical Engineering",
@@ -47,9 +49,12 @@ export default function SignupPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [error, setError] = useState("");
+  const [otpInfo, setOtpInfo] = useState("");
+  const [otp, setOtp] = useState("");
   const [success, setSuccess] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<SignupStep>(1);
 
   const updateField = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -108,14 +113,30 @@ export default function SignupPage() {
   };
 
   const handleBack = () => {
-    setStep(1);
+    if (step === 2) {
+      setStep(1);
+    } else if (step === 3) {
+      setStep(2);
+      setOtp("");
+      setOtpInfo("");
+    }
     setError("");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateStep2()) return;
+  const getSignupPayload = () => ({
+    fullName: form.fullName.trim(),
+    email: form.email.toLowerCase().trim(),
+    password: form.password,
+    role: form.role,
+    department: form.department,
+    ...(form.role === "student" && {
+      studentId: form.studentId.trim(),
+      semester: form.semester ? Number(form.semester) : undefined,
+      batch: form.batch.trim() || undefined,
+    }),
+  });
 
+  const requestOtp = async () => {
     setLoading(true);
     setError("");
 
@@ -123,18 +144,7 @@ export default function SignupPage() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: form.fullName.trim(),
-          email: form.email.toLowerCase().trim(),
-          password: form.password,
-          role: form.role,
-          department: form.department,
-          ...(form.role === "student" && {
-            studentId: form.studentId.trim(),
-            semester: form.semester ? Number(form.semester) : undefined,
-            batch: form.batch.trim() || undefined,
-          }),
-        }),
+        body: JSON.stringify(getSignupPayload()),
       });
 
       const data = await res.json();
@@ -144,12 +154,61 @@ export default function SignupPage() {
         return;
       }
 
-      setSuccess(true);
+      setOtpInfo(data.message || "OTP has been sent to your email");
+      setStep(3);
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateStep2()) return;
+    await requestOtp();
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/signup/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.toLowerCase().trim(),
+          otp: otp.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Failed to verify OTP");
+        return;
+      }
+
+      setSuccess(true);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!validateStep2()) return;
+    setOtp("");
+    await requestOtp();
   };
 
   // --- Success screen ---
@@ -164,7 +223,7 @@ export default function SignupPage() {
           </div>
           <h1 className="text-2xl font-semibold text-text-primary">Account Created</h1>
           <p className="mt-2 text-text-secondary">
-            Your account has been created successfully. You can now sign in.
+            Your email is verified and account is ready. You can now sign in.
           </p>
           <Link
             href="/login"
@@ -213,6 +272,15 @@ export default function SignupPage() {
             </div>
             <span className={`text-sm font-medium ${step >= 2 ? "text-text-primary" : "text-text-secondary"}`}>
               Your Details
+            </span>
+          </div>
+          <div className={`h-px flex-1 ${step >= 3 ? "bg-primary" : "bg-border"}`} />
+          <div className="flex items-center gap-2">
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium ${step >= 3 ? "bg-primary text-white" : "bg-border text-text-secondary"}`}>
+              3
+            </div>
+            <span className={`text-sm font-medium ${step >= 3 ? "text-text-primary" : "text-text-secondary"}`}>
+              Verify OTP
             </span>
           </div>
         </div>
@@ -426,10 +494,78 @@ export default function SignupPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                 ) : (
-                  "Create Account"
+                  "Send OTP"
                 )}
               </button>
             </div>
+          </form>
+        )}
+
+        {/* Step 3 — OTP Verification */}
+        {step === 3 && (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-3">
+              <p className="text-sm text-blue-900">
+                {otpInfo || "We have sent a 6-digit OTP to your email."}
+              </p>
+              <p className="mt-1 text-xs text-blue-700">
+                Email: <span className="font-medium">{form.email.toLowerCase().trim()}</span>
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="otp" className="mb-1.5 block text-sm font-medium text-text-primary">
+                Enter OTP
+              </label>
+              <input
+                id="otp"
+                type="text"
+                value={otp}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+                  setOtp(value);
+                  setError("");
+                }}
+                placeholder="6-digit OTP"
+                inputMode="numeric"
+                maxLength={6}
+                className="h-11 w-full rounded-lg border border-border bg-surface px-3.5 text-sm tracking-[0.3em] text-text-primary placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex h-11 items-center justify-center rounded-lg border border-border bg-surface px-5 text-sm font-medium text-text-primary transition-colors hover:bg-gray-50"
+              >
+                Back
+              </button>
+
+              <button
+                type="submit"
+                disabled={verifyingOtp}
+                className="flex h-11 flex-1 items-center justify-center rounded-lg bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+              >
+                {verifyingOtp ? (
+                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  "Verify & Create Account"
+                )}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={loading}
+              className="w-full text-sm font-medium text-primary transition-colors hover:text-primary-hover disabled:opacity-50"
+            >
+              {loading ? "Resending OTP..." : "Resend OTP"}
+            </button>
           </form>
         )}
 
