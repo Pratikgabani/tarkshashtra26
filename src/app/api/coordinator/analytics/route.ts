@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession } from "@/src/lib/routeSessionAuth";
 import {
   buildClassStats,
   buildCoordinatorStudentRecords,
@@ -10,9 +11,12 @@ import {
  * GET /api/coordinator/analytics
  * Aggregate insights used by analytics view.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
 
     const students = await buildCoordinatorStudentRecords();
     const aggregates = buildSystemAggregates(students);

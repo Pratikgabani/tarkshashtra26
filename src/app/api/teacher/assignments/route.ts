@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Assignment from "@/src/models/assignment";
 import StudentAssignment from "@/src/models/studentAssignment";
 import Subject from "@/src/models/subject";
@@ -64,13 +65,15 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    const teacherId = request.nextUrl.searchParams.get("teacherId");
-    if (!teacherId) {
-      return NextResponse.json(
-        { success: false, message: "teacherId query parameter is required" },
-        { status: 400 }
-      );
-    }
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
+    const scopedTeacherId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("teacherId")
+    );
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
 
     const data = await buildTeacherBaseData(teacherId);
     if (!data) {
@@ -98,16 +101,23 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as Partial<CreateAssignmentInput>;
 
-    if (!body.teacherId || !body.title || !body.subjectId || !body.dueDate || typeof body.maxMarks !== "number") {
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, body.teacherId);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
+
+    if (!body.title || !body.subjectId || !body.dueDate || typeof body.maxMarks !== "number") {
       return NextResponse.json(
         { success: false, message: "teacherId, title, subjectId, dueDate and maxMarks are required" },
         { status: 400 }
       );
     }
 
-    const hasAccess = await hasTeacherAccessToSubject(body.teacherId, body.subjectId);
+    const hasAccess = await hasTeacherAccessToSubject(teacherId, body.subjectId);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Teacher does not have access to this subject" },
@@ -161,7 +171,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const refreshedData = await buildTeacherBaseData(body.teacherId);
+    const refreshedData = await buildTeacherBaseData(teacherId);
 
     return NextResponse.json({
       success: true,
@@ -186,9 +196,16 @@ export async function PUT(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as Partial<SubmissionUpdateInput>;
 
-    if (!body.teacherId || !body.assignmentId || !body.studentId || !body.status) {
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, body.teacherId);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
+
+    if (!body.assignmentId || !body.studentId || !body.status) {
       return NextResponse.json(
         { success: false, message: "teacherId, assignmentId, studentId and status are required" },
         { status: 400 }
@@ -202,7 +219,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const hasAccess = await hasTeacherAccessToAssignment(body.teacherId, body.assignmentId);
+    const hasAccess = await hasTeacherAccessToAssignment(teacherId, body.assignmentId);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Teacher does not have access to this assignment" },
@@ -243,7 +260,7 @@ export async function PUT(request: NextRequest) {
       { new: true }
     );
 
-    const refreshedData = await buildTeacherBaseData(body.teacherId);
+    const refreshedData = await buildTeacherBaseData(teacherId);
 
     return NextResponse.json({
       success: true,
@@ -267,9 +284,16 @@ export async function PATCH(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as Partial<BulkStatusUpdateInput>;
 
-    if (!body.teacherId || !body.assignmentId || !body.status) {
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, body.teacherId);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
+
+    if (!body.assignmentId || !body.status) {
       return NextResponse.json(
         { success: false, message: "teacherId, assignmentId and status are required" },
         { status: 400 }
@@ -283,7 +307,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const hasAccess = await hasTeacherAccessToAssignment(body.teacherId, body.assignmentId);
+    const hasAccess = await hasTeacherAccessToAssignment(teacherId, body.assignmentId);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Teacher does not have access to this assignment" },
@@ -339,7 +363,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const refreshedData = await buildTeacherBaseData(body.teacherId);
+    const refreshedData = await buildTeacherBaseData(teacherId);
 
     return NextResponse.json({
       success: true,

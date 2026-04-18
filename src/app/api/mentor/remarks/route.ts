@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import MentorRemark from "@/src/models/mentorRemark";
 import MentorAction from "@/src/models/mentorAction";
 
@@ -10,6 +11,10 @@ import MentorAction from "@/src/models/mentorAction";
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       actionId?: string;
       mentorId?: string;
@@ -19,13 +24,17 @@ export async function POST(request: NextRequest) {
     };
     const { actionId, mentorId, studentId, text, followUpDate } = body;
 
-    if (!actionId || !mentorId || !studentId || !text?.trim()) {
-      return NextResponse.json({ success: false, message: "actionId, mentorId, studentId, and text are required" }, { status: 400 });
+    const scopedMentorId = resolveScopedUserId(auth.session.sub, mentorId);
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const resolvedMentorId = scopedMentorId.userId;
+
+    if (!actionId || !studentId || !text?.trim()) {
+      return NextResponse.json({ success: false, message: "actionId, studentId, and text are required" }, { status: 400 });
     }
 
     // Verify action exists
     const action = await MentorAction.findById(actionId).lean();
-    if (!action || action.mentorId.toString() !== mentorId) {
+    if (!action || action.mentorId.toString() !== resolvedMentorId) {
       return NextResponse.json({ success: false, message: "Action not found" }, { status: 404 });
     }
     if (action.studentId.toString() !== studentId) {
@@ -43,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const remark = await MentorRemark.create({
       actionId,
-      mentorId,
+      mentorId: resolvedMentorId,
       studentId: action.studentId,
       text: text.trim(),
       followUpDate: parsedFollowUpDate,

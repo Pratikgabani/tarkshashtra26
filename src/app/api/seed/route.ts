@@ -52,6 +52,7 @@ export async function POST() {
       password: hashedPassword,
       role: "mentor",
       department: "Computer Engineering",
+      isEmailVerified: true,
     });
 
     // --- Create Teacher ---
@@ -61,6 +62,7 @@ export async function POST() {
       password: hashedPassword,
       role: "teacher",
       department: "Computer Engineering",
+      isEmailVerified: true,
     });
 
     // --- Create Demo Student ---
@@ -74,6 +76,7 @@ export async function POST() {
       semester: 3,
       batch: "CE-A",
       assignedMentorId: mentor._id.toString(),
+      isEmailVerified: true,
     });
 
     // --- Create Subjects ---

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectDB from "@/src/lib/DB_Connection";
+import { getSessionFromRequest } from "@/src/lib/session";
 import User from "@/src/models/user";
 import Subject from "@/src/models/subject";
 import Attendance from "@/src/models/attendance";
@@ -10,16 +12,41 @@ import LmsActivity from "@/src/models/lmsActivity";
 import RiskScore from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
 
+type SubmissionStatus = "submitted_on_time" | "submitted_late" | "not_submitted";
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    const { searchParams } = new URL(request.url);
-    const studentId = searchParams.get("studentId");
-
-    if (!studentId) {
+    const session = getSessionFromRequest(request);
+    if (!session) {
       return NextResponse.json(
-        { success: false, message: "studentId query parameter is required" },
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    if (session.role !== "student") {
+      return NextResponse.json(
+        { success: false, message: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const requestedStudentId = searchParams.get("studentId")?.trim();
+    const studentId = requestedStudentId || session.sub;
+
+    if (requestedStudentId && requestedStudentId !== session.sub) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid studentId format" },
         { status: 400 }
       );
     }
@@ -40,6 +67,7 @@ export async function GET(request: NextRequest) {
     }).lean();
 
     const subjectIds = subjects.map((s) => s._id);
+    const subjectNameById = new Map(subjects.map((s) => [s._id.toString(), s.name]));
 
     // --- Attendance per subject ---
     const attendance = await Attendance.find({
@@ -108,7 +136,9 @@ export async function GET(request: NextRequest) {
       assignmentId: { $in: assignmentIds },
     }).lean();
 
-    const assignmentMap = new Map(assignments.map((a) => [a._id.toString(), a]));
+    const studentAssignmentMap = new Map(
+      studentAssignments.map((sa) => [sa.assignmentId.toString(), sa])
+    );
 
     const assignmentsBySubject: Record<string, Array<{
       title: string; status: string; dueDate: string; marksObtained: number | null; maxMarks: number;
@@ -121,29 +151,31 @@ export async function GET(request: NextRequest) {
       title: string; subjectName: string; dueDate: string; maxMarks: number;
     }> = [];
 
-    for (const sa of studentAssignments) {
-      const assignment = assignmentMap.get(sa.assignmentId.toString());
-      if (!assignment) continue;
+    for (const assignment of assignments) {
+      const assignmentId = assignment._id.toString();
+      const submission = studentAssignmentMap.get(assignmentId);
+      const status: SubmissionStatus = submission?.status ?? "not_submitted";
+      const marksObtained = submission?.marksObtained ?? null;
 
       const sid = assignment.subjectId.toString();
-      const subjectName = subjects.find((s) => s._id.toString() === sid)?.name || "Unknown";
+      const subjectName = subjectNameById.get(sid) || "Unknown";
 
       if (!assignmentsBySubject[sid]) assignmentsBySubject[sid] = [];
 
       assignmentsBySubject[sid].push({
         title: assignment.title,
-        status: sa.status,
+        status,
         dueDate: assignment.dueDate.toISOString(),
-        marksObtained: sa.marksObtained,
+        marksObtained,
         maxMarks: assignment.maxMarks,
       });
 
       totalAssignments++;
-      if (sa.status === "submitted_on_time" || sa.status === "submitted_late") {
+      if (status === "submitted_on_time" || status === "submitted_late") {
         submittedAssignments++;
       }
-      if (sa.status === "submitted_late") lateSubmissions++;
-      if (sa.status === "not_submitted") {
+      if (status === "submitted_late") lateSubmissions++;
+      if (status === "not_submitted") {
         pendingAssignments.push({
           title: assignment.title,
           subjectName,
@@ -168,24 +200,64 @@ export async function GET(request: NextRequest) {
     const weeklyLogins = recentLms.reduce((sum, r) => sum + r.loginCount, 0);
     const avgLoginsPerWeek = Math.round(weeklyLogins * 10) / 10;
 
-    // --- Risk Score (call dummy/external API) ---
-    let riskData;
-    try {
-      const origin = request.headers.get("host") || "localhost:3000";
-      const protocol = request.headers.get("x-forwarded-proto") || "http";
-      const riskRes = await fetch(`${protocol}://${origin}/api/risk-score`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId }),
-      });
-      const riskJson = await riskRes.json();
-      riskData = riskJson.data;
-    } catch {
-      // Fallback - use latest from DB
-      const latestRisk = await RiskScore.findOne({ studentId: student._id })
-        .sort({ calculatedAt: -1 })
-        .lean();
-      riskData = latestRisk;
+    // --- Risk Score ---
+    let riskData: {
+      studentId: string;
+      score: number;
+      riskLevel: "low" | "medium" | "high" | "critical";
+      factors: unknown[];
+      calculatedAt: string;
+    } | null = null;
+
+    const latestRisk = await RiskScore.findOne({ studentId: student._id })
+      .sort({ calculatedAt: -1 })
+      .lean();
+
+    if (latestRisk) {
+      riskData = {
+        studentId,
+        score: latestRisk.score,
+        riskLevel: latestRisk.riskLevel,
+        factors: latestRisk.factors,
+        calculatedAt: latestRisk.calculatedAt.toISOString(),
+      };
+    }
+
+    if (!riskData) {
+      const internalApiBaseUrl = process.env.APP_BASE_URL?.trim();
+
+      if (internalApiBaseUrl) {
+        try {
+          const normalizedBaseUrl = internalApiBaseUrl.endsWith("/")
+            ? internalApiBaseUrl.slice(0, -1)
+            : internalApiBaseUrl;
+
+          const riskRes = await fetch(`${normalizedBaseUrl}/api/risk-score`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ studentId }),
+          });
+
+          if (riskRes.ok) {
+            const riskJson = (await riskRes.json()) as { data?: typeof riskData };
+            if (riskJson.data) {
+              riskData = riskJson.data;
+            }
+          }
+        } catch (error) {
+          console.error("Risk score fetch error:", error);
+        }
+      }
+    }
+
+    if (!riskData) {
+      riskData = {
+        studentId,
+        score: 0,
+        riskLevel: "low",
+        factors: [],
+        calculatedAt: new Date().toISOString(),
+      };
     }
 
     // --- Risk History ---
@@ -244,7 +316,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         student: {
-          id: student._id,
+          id: student._id.toString(),
           fullName: student.fullName,
           email: student.email,
           studentId: student.studentId,
@@ -260,6 +332,7 @@ export async function GET(request: NextRequest) {
           assignmentCompletionRate,
           lateSubmissions,
           avgLoginsPerWeek,
+          pendingAssignments: pendingAssignments.length,
           pendingAssignmentCount: pendingAssignments.length,
         },
         subjectPerformance,
@@ -270,7 +343,7 @@ export async function GET(request: NextRequest) {
           date: r.calculatedAt.toISOString(),
         })),
         alerts: alerts.map((a) => ({
-          id: a._id,
+          id: a._id.toString(),
           type: a.type,
           priority: a.priority,
           title: a.title,

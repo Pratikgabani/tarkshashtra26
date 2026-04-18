@@ -50,23 +50,6 @@ export default function UserManagement() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [coordinatorId] = useState(() => {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-
-    try {
-      const stored = localStorage.getItem('shikshasetu_user');
-      if (!stored) {
-        return '';
-      }
-
-      const parsed = JSON.parse(stored) as { id?: string };
-      return typeof parsed?.id === 'string' ? parsed.id : '';
-    } catch {
-      return '';
-    }
-  });
   const [filterRole, setFilterRole] = useState<string>('All');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -152,14 +135,6 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!coordinatorId) {
-      setBanner({
-        type: 'error',
-        text: 'Coordinator session not found. Log in again to manage users.',
-      });
-      return;
-    }
-
     if (!window.confirm('Are you sure you want to delete this user?')) {
       return;
     }
@@ -169,7 +144,7 @@ export default function UserManagement() {
       const response = await fetch('/api/coordinator/users', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinatorId, id }),
+        body: JSON.stringify({ id }),
       });
       const json = await response.json();
 
@@ -192,14 +167,6 @@ export default function UserManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!coordinatorId) {
-      setBanner({
-        type: 'error',
-        text: 'Coordinator session not found. Log in again to manage users.',
-      });
-      return;
-    }
-
     if (!name.trim() || !email.trim() || !department.trim()) {
       setBanner({ type: 'error', text: 'Name, email, and department are required.' });
       return;
@@ -218,7 +185,6 @@ export default function UserManagement() {
     try {
       const method = editingUser ? 'PUT' : 'POST';
       const payload: Record<string, unknown> = {
-        coordinatorId,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         role,

@@ -16,6 +16,17 @@ const NAV_ITEMS = [
 export default function StudentSidebar() {
   const pathname = usePathname();
 
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Best-effort logout: still clear client-side session state.
+    } finally {
+      localStorage.removeItem('shikshasetu_user');
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-gray-200 flex flex-col z-30">
       {/* Brand */}
@@ -60,7 +71,7 @@ export default function StudentSidebar() {
       {/* Student Profile Footer */}
       <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50/50">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 shadow-sm flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-white">
               {STUDENT_INFO.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
             </span>
@@ -70,12 +81,13 @@ export default function StudentSidebar() {
             <p className="text-[11px] text-gray-500 truncate">{STUDENT_INFO.id} • {STUDENT_INFO.batch}</p>
           </div>
         </div>
-        <Link
-          href="/"
+        <button
+          type="button"
+          onClick={handleSignOut}
           className="flex items-center justify-center gap-2 w-full py-1.5 rounded-md text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-800 hover:shadow-sm border border-transparent hover:border-gray-200 transition-all duration-200"
         >
           Sign Out
-        </Link>
+        </button>
       </div>
     </aside>
   );

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import {
   buildTeacherBaseData,
   calculateSubjectPercentage,
@@ -36,13 +37,15 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    const teacherId = request.nextUrl.searchParams.get("teacherId");
-    if (!teacherId) {
-      return NextResponse.json(
-        { success: false, message: "teacherId query parameter is required" },
-        { status: 400 }
-      );
-    }
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
+    const scopedTeacherId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("teacherId")
+    );
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
 
     const baseData = await buildTeacherBaseData(teacherId);
     if (!baseData) {

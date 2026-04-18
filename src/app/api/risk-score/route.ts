@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
  * ----------------------------------------------------------
  */
 
-const EXTERNAL_RISK_API_URL = ""; // <-- Add your real API link here
+const EXTERNAL_RISK_API_URL = process.env.EXTERNAL_RISK_API_URL?.trim() || "";
 
 export async function POST(request: NextRequest) {
   try {

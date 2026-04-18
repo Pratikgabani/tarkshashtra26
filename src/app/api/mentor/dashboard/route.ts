@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
 import RiskScore from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
@@ -11,8 +12,16 @@ import MentorAction from "@/src/models/mentorAction";
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const mentorId = request.nextUrl.searchParams.get("mentorId");
-    if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
+    const scopedMentorId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("mentorId")
+    );
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const mentorId = scopedMentorId.userId;
 
     const mentor = await User.findById(mentorId).lean();
     if (!mentor || mentor.role !== "mentor") return NextResponse.json({ success: false, message: "Mentor not found" }, { status: 404 });

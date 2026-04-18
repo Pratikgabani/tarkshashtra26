@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
@@ -24,9 +25,17 @@ export async function GET(
 ) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
     const { id: studentId } = await params;
-    const mentorId = request.nextUrl.searchParams.get("mentorId");
-    if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
+    const scopedMentorId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("mentorId")
+    );
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const mentorId = scopedMentorId.userId;
 
     const student = await User.findById(studentId).lean();
     if (!student || student.role !== "student" || student.assignedMentorId !== mentorId) {

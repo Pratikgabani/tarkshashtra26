@@ -31,7 +31,7 @@ export default function ActionsPage() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/mentor/actions?mentorId=${user.id}`);
+        const res = await fetch('/api/mentor/actions');
         const json = await res.json();
         if (res.ok && isActive) setActions(json.data || []);
       } catch {
@@ -49,7 +49,7 @@ export default function ActionsPage() {
   async function updateStatus(id: string, status: string) {
     const user = getUser();
     if (!user) { window.location.assign('/login'); return; }
-    await fetch('/api/mentor/actions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: id, mentorId: user.id, status }) });
+    await fetch('/api/mentor/actions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: id, status }) });
     refreshActions();
   }
 
@@ -59,7 +59,7 @@ export default function ActionsPage() {
     const action = actions.find(a => a.id === remarkActionId);
     if (!action) return;
     await fetch('/api/mentor/remarks', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionId: remarkActionId, mentorId: user.id, studentId: action.studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }) });
+      body: JSON.stringify({ actionId: remarkActionId, studentId: action.studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }) });
     setRemarkActionId(null); setRemarkText(''); setRemarkFollowUp('');
     refreshActions();
   }

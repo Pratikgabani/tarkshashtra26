@@ -36,7 +36,7 @@ export default function AlertsPage() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/mentor/alerts?mentorId=${user.id}`);
+        const res = await fetch('/api/mentor/alerts');
         const json = await res.json();
         if (res.ok && isActive) setAlerts(json.data || []);
       } catch {
@@ -54,7 +54,7 @@ export default function AlertsPage() {
   async function acknowledge(id: string) {
     const user = getUser();
     if (!user) { window.location.assign('/login'); return; }
-    await fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id, mentorId: user.id, status: 'acknowledged' }) });
+    await fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id, status: 'acknowledged' }) });
     refreshAlerts();
   }
 
@@ -62,7 +62,7 @@ export default function AlertsPage() {
     const user = getUser();
     if (!user) { window.location.assign('/login'); return; }
     const unread = alerts.filter(a => a.status === 'unread');
-    await Promise.all(unread.map(a => fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: a.id, mentorId: user.id, status: 'acknowledged' }) })));
+    await Promise.all(unread.map(a => fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: a.id, status: 'acknowledged' }) })));
     refreshAlerts();
   }
 

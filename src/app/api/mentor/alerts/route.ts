@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Alert, { type AlertStatus } from "@/src/models/alert";
 import User from "@/src/models/user";
 
@@ -11,8 +12,16 @@ const VALID_ALERT_STATUSES: AlertStatus[] = ["unread", "acknowledged", "actioned
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const mentorId = request.nextUrl.searchParams.get("mentorId");
-    if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
+    const scopedMentorId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("mentorId")
+    );
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const mentorId = scopedMentorId.userId;
 
     const alerts = await Alert.find({ mentorId }).sort({ sentAt: -1 }).lean();
 
@@ -48,6 +57,10 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       alertId?: string;
       mentorId?: string;
@@ -55,8 +68,12 @@ export async function PUT(request: NextRequest) {
     };
     const { alertId, mentorId, status } = body;
 
-    if (!alertId || !mentorId || !status) {
-      return NextResponse.json({ success: false, message: "alertId, mentorId and status required" }, { status: 400 });
+    const scopedMentorId = resolveScopedUserId(auth.session.sub, mentorId);
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const resolvedMentorId = scopedMentorId.userId;
+
+    if (!alertId || !status) {
+      return NextResponse.json({ success: false, message: "alertId and status required" }, { status: 400 });
     }
     if (!VALID_ALERT_STATUSES.includes(status)) {
       return NextResponse.json({ success: false, message: "Invalid alert status" }, { status: 400 });
@@ -66,7 +83,7 @@ export async function PUT(request: NextRequest) {
     if (!alert) {
       return NextResponse.json({ success: false, message: "Alert not found" }, { status: 404 });
     }
-    if (!alert.mentorId || alert.mentorId.toString() !== mentorId) {
+    if (!alert.mentorId || alert.mentorId.toString() !== resolvedMentorId) {
       return NextResponse.json({ success: false, message: "Not authorized to update this alert" }, { status: 403 });
     }
 

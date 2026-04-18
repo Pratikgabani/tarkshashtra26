@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession } from "@/src/lib/routeSessionAuth";
 import { buildCoordinatorInterventions } from "@/src/lib/coordinatorBackend";
 
 /**
@@ -9,6 +10,9 @@ import { buildCoordinatorInterventions } from "@/src/lib/coordinatorBackend";
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
 
     const limitParam = request.nextUrl.searchParams.get("limit");
     const parsedLimit = Number(limitParam);

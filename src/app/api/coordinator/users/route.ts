@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import {
   dbRoleToUiRole,
   ensureCoordinatorUser,
@@ -46,6 +47,17 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
+
+    const coordinatorAuth = await ensureCoordinatorUser(auth.session.sub);
+    if (!coordinatorAuth.ok) {
+      return NextResponse.json(
+        { success: false, message: coordinatorAuth.message },
+        { status: 403 }
+      );
+    }
+
     const role = request.nextUrl.searchParams.get("role");
     const users = await listCoordinatorUsers(role);
 
@@ -84,6 +96,9 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       coordinatorId?: string;
       name?: string;
@@ -98,18 +113,14 @@ export async function POST(request: NextRequest) {
       assignedMentorId?: string;
     };
 
-    const coordinatorId = body.coordinatorId?.trim();
-    if (!coordinatorId) {
-      return NextResponse.json(
-        { success: false, message: "coordinatorId is required" },
-        { status: 400 }
-      );
-    }
+    const scopedCoordinatorId = resolveScopedUserId(auth.session.sub, body.coordinatorId);
+    if (!scopedCoordinatorId.ok) return scopedCoordinatorId.response;
+    const coordinatorId = scopedCoordinatorId.userId;
 
-    const auth = await ensureCoordinatorUser(coordinatorId);
-    if (!auth.ok) {
+    const coordinatorAuth = await ensureCoordinatorUser(coordinatorId);
+    if (!coordinatorAuth.ok) {
       return NextResponse.json(
-        { success: false, message: auth.message },
+        { success: false, message: coordinatorAuth.message },
         { status: 403 }
       );
     }
@@ -220,6 +231,9 @@ export async function PUT(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       coordinatorId?: string;
       id?: string;
@@ -235,12 +249,14 @@ export async function PUT(request: NextRequest) {
       assignedMentorId?: string;
     };
 
-    const coordinatorId = body.coordinatorId?.trim();
+    const scopedCoordinatorId = resolveScopedUserId(auth.session.sub, body.coordinatorId);
+    if (!scopedCoordinatorId.ok) return scopedCoordinatorId.response;
+    const coordinatorId = scopedCoordinatorId.userId;
     const userId = body.id?.trim();
 
-    if (!coordinatorId || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "coordinatorId and id are required" },
+        { success: false, message: "id is required" },
         { status: 400 }
       );
     }
@@ -252,10 +268,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const auth = await ensureCoordinatorUser(coordinatorId);
-    if (!auth.ok) {
+    const coordinatorAuth = await ensureCoordinatorUser(coordinatorId);
+    if (!coordinatorAuth.ok) {
       return NextResponse.json(
-        { success: false, message: auth.message },
+        { success: false, message: coordinatorAuth.message },
         { status: 403 }
       );
     }
@@ -393,17 +409,22 @@ export async function DELETE(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       coordinatorId?: string;
       id?: string;
     };
 
-    const coordinatorId = body.coordinatorId?.trim();
+    const scopedCoordinatorId = resolveScopedUserId(auth.session.sub, body.coordinatorId);
+    if (!scopedCoordinatorId.ok) return scopedCoordinatorId.response;
+    const coordinatorId = scopedCoordinatorId.userId;
     const userId = body.id?.trim();
 
-    if (!coordinatorId || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "coordinatorId and id are required" },
+        { success: false, message: "id is required" },
         { status: 400 }
       );
     }
@@ -422,10 +443,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const auth = await ensureCoordinatorUser(coordinatorId);
-    if (!auth.ok) {
+    const coordinatorAuth = await ensureCoordinatorUser(coordinatorId);
+    if (!coordinatorAuth.ok) {
       return NextResponse.json(
-        { success: false, message: auth.message },
+        { success: false, message: coordinatorAuth.message },
         { status: 403 }
       );
     }

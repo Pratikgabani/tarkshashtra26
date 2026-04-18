@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
@@ -11,13 +12,22 @@ import RiskScore from "@/src/models/riskScore";
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const mentorId = request.nextUrl.searchParams.get("mentorId");
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
+    const scopedMentorId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("mentorId")
+    );
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const mentorId = scopedMentorId.userId;
+
     const riskFilter = request.nextUrl.searchParams.get("risk");
     const search = request.nextUrl.searchParams.get("search");
     const batch = request.nextUrl.searchParams.get("batch");
     const sanitizedBatch = batch?.trim();
 
-    if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
     if (sanitizedBatch && !/^[A-Za-z0-9-]{1,20}$/.test(sanitizedBatch)) {
       return NextResponse.json({ success: false, message: "Invalid batch filter" }, { status: 400 });
     }

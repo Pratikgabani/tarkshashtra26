@@ -16,6 +16,17 @@ const NAV_ITEMS = [
 export default function CoordinatorSidebar() {
   const pathname = usePathname();
 
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Best-effort logout: still clear client-side session state.
+    } finally {
+      localStorage.removeItem('shikshasetu_user');
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-[#E5E7EB] flex flex-col z-30">
       
@@ -46,7 +57,7 @@ export default function CoordinatorSidebar() {
                   : 'text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#111827]'
               }`}
             >
-              <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-[#2563EB]' : 'text-[#6B7280]'}`} />
+              <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-[#2563EB]' : 'text-[#6B7280]'}`} />
               {item.label}
             </Link>
           );
@@ -56,7 +67,7 @@ export default function CoordinatorSidebar() {
       {/* Footer Profile */}
       <div className="p-5 border-t border-[#E5E7EB] shrink-0 bg-[#F9FAFB]">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#2563EB] to-blue-400 flex items-center justify-center shrink-0 shadow-sm border border-blue-600">
+          <div className="w-10 h-10 rounded-full bg-linear-to-tr from-[#2563EB] to-blue-400 flex items-center justify-center shrink-0 shadow-sm border border-blue-600">
             <span className="text-sm font-bold text-white">AC</span>
           </div>
           <div className="min-w-0">
@@ -64,12 +75,13 @@ export default function CoordinatorSidebar() {
             <p className="text-xs text-[#6B7280] truncate font-medium">Head of Academics</p>
           </div>
         </div>
-        <Link
-          href="/"
+        <button
+          type="button"
+          onClick={handleSignOut}
           className="flex items-center justify-center w-full py-2 rounded-lg text-xs font-semibold text-[#6B7280] hover:bg-white hover:text-[#111827] border border-[#E5E7EB] hover:shadow-sm transition-all duration-200"
         >
           Sign Out
-        </Link>
+        </button>
       </div>
     </aside>
   );

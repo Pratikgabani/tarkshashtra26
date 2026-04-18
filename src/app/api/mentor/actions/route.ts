@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import MentorAction from "@/src/models/mentorAction";
 import MentorRemark from "@/src/models/mentorRemark";
 import User from "@/src/models/user";
@@ -13,9 +14,18 @@ type ActionStatus = (typeof VALID_ACTION_STATUSES)[number];
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const mentorId = request.nextUrl.searchParams.get("mentorId");
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
+    const scopedMentorId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("mentorId")
+    );
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const mentorId = scopedMentorId.userId;
+
     const studentId = request.nextUrl.searchParams.get("studentId");
-    if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
 
     const query: Record<string, unknown> = { mentorId };
     if (studentId) query.studentId = studentId;
@@ -65,10 +75,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { mentorId, studentId, actionType, description, date } = body;
 
-    if (!mentorId || !studentId || !actionType || !description || !date) {
+    const scopedMentorId = resolveScopedUserId(auth.session.sub, mentorId);
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const resolvedMentorId = scopedMentorId.userId;
+
+    if (!studentId || !actionType || !description || !date) {
       return NextResponse.json({ success: false, message: "All fields required" }, { status: 400 });
     }
 
@@ -78,12 +96,12 @@ export async function POST(request: NextRequest) {
     }
 
     const student = await User.findById(studentId).lean();
-    if (!student || student.assignedMentorId !== mentorId) {
+    if (!student || student.assignedMentorId !== resolvedMentorId) {
       return NextResponse.json({ success: false, message: "Student not assigned to you" }, { status: 403 });
     }
 
     const action = await MentorAction.create({
-      mentorId,
+      mentorId: resolvedMentorId,
       studentId,
       actionType,
       description: description.trim(),
@@ -109,6 +127,10 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "mentor");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as {
       actionId?: string;
       mentorId?: string;
@@ -117,8 +139,12 @@ export async function PUT(request: NextRequest) {
     };
     const { actionId, mentorId, status, outcome } = body;
 
-    if (!actionId || !mentorId) {
-      return NextResponse.json({ success: false, message: "actionId and mentorId required" }, { status: 400 });
+    const scopedMentorId = resolveScopedUserId(auth.session.sub, mentorId);
+    if (!scopedMentorId.ok) return scopedMentorId.response;
+    const resolvedMentorId = scopedMentorId.userId;
+
+    if (!actionId) {
+      return NextResponse.json({ success: false, message: "actionId required" }, { status: 400 });
     }
 
     if (status && !VALID_ACTION_STATUSES.includes(status)) {
@@ -129,7 +155,7 @@ export async function PUT(request: NextRequest) {
     if (!action) {
       return NextResponse.json({ success: false, message: "Action not found" }, { status: 404 });
     }
-    if (action.mentorId.toString() !== mentorId) {
+    if (action.mentorId.toString() !== resolvedMentorId) {
       return NextResponse.json({ success: false, message: "Not authorized to update this action" }, { status: 403 });
     }
 

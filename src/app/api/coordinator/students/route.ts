@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession } from "@/src/lib/routeSessionAuth";
 import {
   buildCoordinatorStudentRecords,
   type CoordinatorRiskLevel,
@@ -21,6 +22,9 @@ function severity(level: CoordinatorRiskLevel): number {
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
+
+    const auth = requireRoleSession(request, "coordinator");
+    if (!auth.ok) return auth.response;
 
     const search = request.nextUrl.searchParams.get("search")?.trim() || "";
     const department = request.nextUrl.searchParams.get("department")?.trim() || "All";

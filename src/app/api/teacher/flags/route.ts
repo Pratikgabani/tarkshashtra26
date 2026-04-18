@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Alert from "@/src/models/alert";
 import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
@@ -31,13 +32,15 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    const teacherId = request.nextUrl.searchParams.get("teacherId");
-    if (!teacherId) {
-      return NextResponse.json(
-        { success: false, message: "teacherId query parameter is required" },
-        { status: 400 }
-      );
-    }
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
+    const scopedTeacherId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("teacherId")
+    );
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
 
     const data = await buildTeacherBaseData(teacherId);
     if (!data) {
@@ -71,9 +74,16 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as Partial<TeacherFlagInput>;
 
-    if (!body.teacherId || !body.studentId || !body.note) {
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, body.teacherId);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
+
+    if (!body.studentId || !body.note) {
       return NextResponse.json(
         { success: false, message: "teacherId, studentId and note are required" },
         { status: 400 }
@@ -88,7 +98,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasAccess = await teacherHasStudentAccess(body.teacherId, body.studentId);
+    const hasAccess = await teacherHasStudentAccess(teacherId, body.studentId);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Teacher does not have access to this student" },
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     const [teacher, student] = await Promise.all([
-      User.findById(body.teacherId).lean(),
+      User.findById(teacherId).lean(),
       User.findById(body.studentId).lean(),
     ]);
 
@@ -125,7 +135,7 @@ export async function POST(request: NextRequest) {
       sentAt: new Date(),
     });
 
-    const refreshed = await buildTeacherBaseData(body.teacherId);
+    const refreshed = await buildTeacherBaseData(teacherId);
 
     return NextResponse.json({
       success: true,

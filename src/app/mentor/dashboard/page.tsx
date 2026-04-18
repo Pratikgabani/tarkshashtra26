@@ -99,8 +99,7 @@ export default function MentorDashboard() {
       try {
         const stored = localStorage.getItem('shikshasetu_user');
         if (stored) {
-          const user = JSON.parse(stored);
-          const res = await fetch(`/api/mentor/dashboard?mentorId=${user.id}`);
+          const res = await fetch('/api/mentor/dashboard');
           const json = await res.json();
           if (res.ok && json.data && json.data.summary?.totalStudents > 0) {
             setData(json.data); setLoading(false); return;

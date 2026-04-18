@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
+import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Assessment from "@/src/models/assessment";
 import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
@@ -90,13 +91,15 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    const teacherId = request.nextUrl.searchParams.get("teacherId");
-    if (!teacherId) {
-      return NextResponse.json(
-        { success: false, message: "teacherId query parameter is required" },
-        { status: 400 }
-      );
-    }
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
+    const scopedTeacherId = resolveScopedUserId(
+      auth.session.sub,
+      request.nextUrl.searchParams.get("teacherId")
+    );
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
 
     const data = await buildTeacherBaseData(teacherId);
     if (!data) {
@@ -124,16 +127,15 @@ export async function PUT(request: NextRequest) {
   try {
     await connectDB();
 
-    const body = await request.json();
-    const teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
-    const updates = Array.isArray(body.updates) ? (body.updates as MarkUpdateInput[]) : [];
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
 
-    if (!teacherId) {
-      return NextResponse.json(
-        { success: false, message: "teacherId is required" },
-        { status: 400 }
-      );
-    }
+    const body = await request.json();
+    const teacherIdInput = typeof body.teacherId === "string" ? body.teacherId : undefined;
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, teacherIdInput);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
+    const updates = Array.isArray(body.updates) ? (body.updates as MarkUpdateInput[]) : [];
 
     if (updates.length === 0) {
       return NextResponse.json(
@@ -222,11 +224,17 @@ export async function PATCH(request: NextRequest) {
   try {
     await connectDB();
 
+    const auth = requireRoleSession(request, "teacher");
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
-    const teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
+    const teacherIdInput = typeof body.teacherId === "string" ? body.teacherId : undefined;
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, teacherIdInput);
+    if (!scopedTeacherId.ok) return scopedTeacherId.response;
+    const teacherId = scopedTeacherId.userId;
     const update = body.update as BulkMarkUpdateInput | undefined;
 
-    if (!teacherId || !update?.subjectId || !update?.assessmentId || !Array.isArray(update.rows)) {
+    if (!update?.subjectId || !update?.assessmentId || !Array.isArray(update.rows)) {
       return NextResponse.json(
         { success: false, message: "teacherId and a valid bulk update payload are required" },
         { status: 400 }

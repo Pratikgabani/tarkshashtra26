@@ -70,9 +70,7 @@ export default function StudentsPage() {
       try {
         const stored = localStorage.getItem('shikshasetu_user');
         if (stored) {
-          const user = JSON.parse(stored);
-          const params = new URLSearchParams({ mentorId: user.id });
-          const res = await fetch(`/api/mentor/students?${params}`);
+          const res = await fetch('/api/mentor/students');
           const json = await res.json();
           if (res.ok && json.data && json.data.length > 0) {
             setStudents(json.data); setLoading(false); return;

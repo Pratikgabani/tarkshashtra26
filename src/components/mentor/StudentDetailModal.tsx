@@ -82,7 +82,7 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
 
     (async () => {
       try {
-        const res = await fetch(`/api/mentor/students/${studentId}?mentorId=${user.id}`);
+        const res = await fetch(`/api/mentor/students/${studentId}`);
         const json = await res.json();
         if (res.ok && isActive) setData(json.data);
       } catch {
@@ -105,7 +105,7 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
       await fetch('/api/mentor/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mentorId: user.id, studentId, ...actionForm }),
+        body: JSON.stringify({ studentId, ...actionForm }),
       });
       setShowActionForm(false);
       setActionForm({ actionType: 'counseling', description: '', date: new Date().toISOString().split('T')[0] });
@@ -121,7 +121,7 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
       await fetch('/api/mentor/remarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId: remarkActionId, mentorId: user.id, studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }),
+        body: JSON.stringify({ actionId: remarkActionId, studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }),
       });
       setRemarkActionId(null);
       setRemarkText('');
@@ -140,7 +140,7 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
       await fetch('/api/mentor/actions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId, mentorId: user.id, status }),
+        body: JSON.stringify({ actionId, status }),
       });
       refreshDetail();
     } catch { /* ignore */ }
