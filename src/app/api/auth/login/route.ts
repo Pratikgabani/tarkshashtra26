@@ -36,6 +36,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (user.isActive === false) {
+      return NextResponse.json(
+        { success: false, message: "This account is inactive. Contact coordinator." },
+        { status: 403 }
+      );
+    }
+
     if (!user.isEmailVerified) {
       return NextResponse.json(
         {
