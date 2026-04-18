@@ -226,6 +226,63 @@ function CreateAssignmentModal({
   );
 }
 
+function SubmissionPreviewModal({
+  studentName,
+  fileName,
+  fileUrl,
+  onClose,
+}: {
+  studentName: string;
+  fileName: string | null;
+  fileUrl: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[85vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Student Submission</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {studentName}
+              {fileName ? ` • ${fileName}` : ''}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 p-4 bg-gray-50">
+          <iframe
+            src={fileUrl}
+            title="Submission Preview"
+            className="w-full h-full rounded-lg border border-gray-200 bg-white"
+          />
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-1.5 border border-blue-200 bg-blue-50 text-blue-700 rounded text-xs font-semibold hover:bg-blue-100"
+          >
+            Open in New Tab
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TeacherAssignmentsPage() {
   const [data, setData] = useState<AssignmentsPageData | null>(null);
   const [editableSubmissions, setEditableSubmissions] = useState<AssignmentsPageData['submissions']>({});
@@ -242,6 +299,11 @@ export default function TeacherAssignmentsPage() {
   const [notice, setNotice] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [flagTarget, setFlagTarget] = useState<{ id: string; name: string } | null>(null);
+  const [previewSubmission, setPreviewSubmission] = useState<{
+    studentName: string;
+    fileName: string | null;
+    fileUrl: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -364,6 +426,30 @@ export default function TeacherAssignmentsPage() {
 
     return { onTime, late, missing };
   }, [data, selectedAssignment, editableSubmissions]);
+
+  function openSubmissionPreview(row: {
+    student: { name: string };
+    status: UiSubmissionStatus;
+    fileName: string | null;
+    fileUrl: string | null;
+  }) {
+    if (row.status === 'Not Submitted') {
+      setError('This assignment is not submitted yet.');
+      return;
+    }
+
+    if (!row.fileUrl) {
+      setError('No uploaded PDF found for this submission. Ask the student to submit again with a PDF.');
+      return;
+    }
+
+    setError('');
+    setPreviewSubmission({
+      studentName: row.student.name,
+      fileName: row.fileName,
+      fileUrl: row.fileUrl,
+    });
+  }
 
   function updateRow(studentId: string, patch: Partial<{ status: UiSubmissionStatus; marks: number | null }>) {
     if (!selectedAssignment) return;
@@ -607,6 +693,15 @@ export default function TeacherAssignmentsPage() {
         />
       )}
 
+      {previewSubmission && (
+        <SubmissionPreviewModal
+          studentName={previewSubmission.studentName}
+          fileName={previewSubmission.fileName}
+          fileUrl={previewSubmission.fileUrl}
+          onClose={() => setPreviewSubmission(null)}
+        />
+      )}
+
       <main className="flex-1 flex overflow-hidden">
         <aside className="w-72 bg-white border-r border-gray-200 flex flex-col shrink-0">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -826,18 +921,18 @@ export default function TeacherAssignmentsPage() {
                             </select>
                           </td>
                           <td className="px-4 py-2.5 text-xs text-gray-600">
-                            {row.fileUrl ? (
-                              <a
-                                href={row.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
-                              >
-                                {row.fileName || 'View PDF'}
-                              </a>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => openSubmissionPreview(row)}
+                              disabled={row.status === 'Not Submitted'}
+                              className={`inline-flex items-center rounded px-2.5 py-1 text-xs font-semibold ${
+                                row.status === 'Not Submitted'
+                                  ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                              }`}
+                            >
+                              {row.status === 'Not Submitted' ? 'No Submission' : 'See Submission'}
+                            </button>
                           </td>
                           <td className="px-4 py-2.5">
                             {row.status !== 'Not Submitted' ? (
