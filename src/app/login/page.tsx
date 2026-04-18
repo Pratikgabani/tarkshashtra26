@@ -48,6 +48,8 @@ export default function LoginPage() {
         window.location.href = "/student/dashboard";
       } else if (data.user.role === "mentor") {
         window.location.href = "/mentor/dashboard";
+      } else if (data.user.role === "teacher") {
+        window.location.href = "/teacher/dashboard";
       } else {
         window.location.href = "/";
       }
