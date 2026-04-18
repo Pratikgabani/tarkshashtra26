@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TEACHER } from '@/src/lib/teacherData';
+import { useEffect, useState } from 'react';
+
+interface StoredUser {
+  id?: string;
+  fullName?: string;
+  role?: string;
+  department?: string;
+}
 
 const NAV = [
   {
@@ -43,8 +50,53 @@ const NAV = [
   },
 ];
 
+function getStoredTeacher(): { fullName: string; department: string } | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = localStorage.getItem('shikshasetu_user');
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as StoredUser;
+    if (parsed.role !== 'teacher') {
+      return null;
+    }
+
+    return {
+      fullName: parsed.fullName || 'Teacher',
+      department: parsed.department || 'Department',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function TeacherSidebar() {
   const pathname = usePathname();
+  const [teacher, setTeacher] = useState<{ fullName: string; department: string } | null>(null);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setTeacher(getStoredTeacher());
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const teacherName = teacher?.fullName || 'Teacher';
+  const teacherDepartment = teacher?.department || 'Department';
+  const teacherInitials = teacherName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleSignOut = async () => {
     try {
@@ -98,13 +150,11 @@ export default function TeacherSidebar() {
       <div className="px-3 py-3 border-t border-gray-100 shrink-0">
         <div className="flex items-center gap-2.5 px-2 py-2">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-blue-700">
-              {TEACHER.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-            </span>
+            <span className="text-xs font-bold text-blue-700">{teacherInitials}</span>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-gray-800 truncate">{TEACHER.name}</p>
-            <p className="text-xs text-gray-400 truncate">Subject Teacher</p>
+            <p className="text-xs font-semibold text-gray-800 truncate">{teacherName}</p>
+            <p className="text-xs text-gray-400 truncate">{teacherDepartment}</p>
           </div>
         </div>
         <button

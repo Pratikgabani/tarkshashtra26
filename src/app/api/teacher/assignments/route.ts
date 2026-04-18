@@ -20,12 +20,20 @@ interface CreateAssignmentInput {
   maxMarks: number;
 }
 
-interface SubmissionUpdateInput {
-  teacherId: string;
+interface SubmissionRowUpdateInput {
   assignmentId: string;
   studentId: string;
   status: UiSubmissionStatus;
   marks: number | null;
+}
+
+interface SubmissionUpdateInput {
+  teacherId?: string;
+  assignmentId?: string;
+  studentId?: string;
+  status?: UiSubmissionStatus;
+  marks?: number | null;
+  updates?: Array<Partial<SubmissionRowUpdateInput>>;
 }
 
 interface BulkStatusUpdateInput {
@@ -37,6 +45,10 @@ interface BulkStatusUpdateInput {
 
 function isSubmissionStatus(value: string): value is UiSubmissionStatus {
   return value === "On Time" || value === "Late" || value === "Not Submitted";
+}
+
+function isLikelyObjectId(value: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(value);
 }
 
 async function hasTeacherAccessToSubject(teacherId: string, subjectId: string): Promise<boolean> {
@@ -190,7 +202,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/teacher/assignments
- * Body: SubmissionUpdateInput
+ * Body: { teacherId?, updates: SubmissionRowUpdateInput[] }
+ * Also supports single update payload for backward compatibility.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -205,66 +218,150 @@ export async function PUT(request: NextRequest) {
     if (!scopedTeacherId.ok) return scopedTeacherId.response;
     const teacherId = scopedTeacherId.userId;
 
-    if (!body.assignmentId || !body.studentId || !body.status) {
+    const rawUpdates = Array.isArray(body.updates)
+      ? body.updates
+      : [body as Partial<SubmissionRowUpdateInput>];
+
+    if (rawUpdates.length === 0) {
       return NextResponse.json(
-        { success: false, message: "teacherId, assignmentId, studentId and status are required" },
+        { success: false, message: "At least one submission update is required" },
         { status: 400 }
       );
     }
 
-    if (!isSubmissionStatus(body.status)) {
+    const updates: SubmissionRowUpdateInput[] = rawUpdates.map((entry) => ({
+      assignmentId: typeof entry.assignmentId === "string" ? entry.assignmentId : "",
+      studentId: typeof entry.studentId === "string" ? entry.studentId : "",
+      status: entry.status as UiSubmissionStatus,
+      marks: typeof entry.marks === "number" || entry.marks === null ? entry.marks : null,
+    }));
+
+    const errors: string[] = [];
+
+    for (const [index, update] of updates.entries()) {
+      const row = index + 1;
+      if (!update.assignmentId || !update.studentId || !update.status) {
+        errors.push(`Update ${row}: assignmentId, studentId and status are required`);
+        continue;
+      }
+
+      if (!isLikelyObjectId(update.assignmentId)) {
+        errors.push(`Update ${row}: invalid assignmentId`);
+      }
+
+      if (!isLikelyObjectId(update.studentId)) {
+        errors.push(`Update ${row}: invalid studentId`);
+      }
+
+      if (!isSubmissionStatus(update.status)) {
+        errors.push(`Update ${row}: invalid status`);
+      }
+    }
+
+    if (errors.length > 0) {
       return NextResponse.json(
-        { success: false, message: "Invalid status" },
+        { success: false, message: "Some updates failed validation", errors },
         { status: 400 }
       );
     }
 
-    const hasAccess = await hasTeacherAccessToAssignment(teacherId, body.assignmentId);
-    if (!hasAccess) {
-      return NextResponse.json(
-        { success: false, message: "Teacher does not have access to this assignment" },
-        { status: 403 }
-      );
-    }
+    const assignmentIds = Array.from(new Set(updates.map((update) => update.assignmentId)));
+    const assignmentDocs = await Assignment.find({ _id: { $in: assignmentIds } })
+      .select("_id subjectId maxMarks")
+      .lean();
 
-    const assignment = await Assignment.findById(body.assignmentId).lean();
-    if (!assignment) {
-      return NextResponse.json(
-        { success: false, message: "Assignment not found" },
-        { status: 404 }
-      );
-    }
-
-    await ensureStudentAssignment(body.assignmentId, body.studentId);
-
-    const marks = body.marks ?? null;
-    if (marks !== null && (typeof marks !== "number" || marks < 0 || marks > assignment.maxMarks)) {
-      return NextResponse.json(
-        { success: false, message: `marks must be between 0 and ${assignment.maxMarks}` },
-        { status: 400 }
-      );
-    }
-
-    const dbStatus = uiSubmissionStatusToDbStatus(body.status);
-    const now = new Date();
-
-    await StudentAssignment.findOneAndUpdate(
-      { assignmentId: body.assignmentId, studentId: body.studentId },
-      {
-        $set: {
-          status: dbStatus,
-          marksObtained: dbStatus === "not_submitted" ? null : marks,
-          submittedAt: dbStatus === "not_submitted" ? null : now,
-        },
-      },
-      { new: true }
+    const assignmentMap = new Map(
+      assignmentDocs.map((assignment) => [assignment._id.toString(), assignment])
     );
+
+    for (const assignmentId of assignmentIds) {
+      const assignment = assignmentMap.get(assignmentId);
+      if (!assignment) {
+        errors.push(`Assignment not found: ${assignmentId}`);
+        continue;
+      }
+
+      const hasAccess = await hasTeacherAccessToSubject(teacherId, assignment.subjectId.toString());
+      if (!hasAccess) {
+        errors.push(`Teacher does not have access to assignment ${assignmentId}`);
+      }
+    }
+
+    const subjectIds = Array.from(
+      new Set(assignmentDocs.map((assignment) => assignment.subjectId.toString()))
+    );
+    const subjectDocs = subjectIds.length > 0
+      ? await Subject.find({ _id: { $in: subjectIds } }).select("_id department semester").lean()
+      : [];
+    const subjectMap = new Map(subjectDocs.map((subject) => [subject._id.toString(), subject]));
+
+    const studentIds = Array.from(new Set(updates.map((update) => update.studentId)));
+    const studentDocs = studentIds.length > 0
+      ? await User.find({ _id: { $in: studentIds }, role: "student" })
+        .select("_id department semester")
+        .lean()
+      : [];
+    const studentMap = new Map(studentDocs.map((student) => [student._id.toString(), student]));
+
+    for (const [index, update] of updates.entries()) {
+      const row = index + 1;
+      const assignment = assignmentMap.get(update.assignmentId);
+      if (!assignment) continue;
+
+      const subject = subjectMap.get(assignment.subjectId.toString());
+      if (!subject) {
+        errors.push(`Update ${row}: subject not found for assignment ${update.assignmentId}`);
+        continue;
+      }
+
+      const student = studentMap.get(update.studentId);
+      if (!student) {
+        errors.push(`Update ${row}: student not found`);
+        continue;
+      }
+
+      if (student.department !== subject.department || student.semester !== subject.semester) {
+        errors.push(`Update ${row}: student does not belong to assignment subject cohort`);
+      }
+
+      if (update.marks !== null && (update.marks < 0 || update.marks > assignment.maxMarks)) {
+        errors.push(`Update ${row}: marks must be between 0 and ${assignment.maxMarks}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json(
+        { success: false, message: "Some updates failed validation", errors },
+        { status: 400 }
+      );
+    }
+
+    for (const update of updates) {
+      const dbStatus = uiSubmissionStatusToDbStatus(update.status);
+      const now = new Date();
+
+      await ensureStudentAssignment(update.assignmentId, update.studentId);
+
+      await StudentAssignment.findOneAndUpdate(
+        { assignmentId: update.assignmentId, studentId: update.studentId },
+        {
+          $set: {
+            status: dbStatus,
+            marksObtained: dbStatus === "not_submitted" ? null : update.marks,
+            submittedAt: dbStatus === "not_submitted" ? null : now,
+          },
+        },
+        { new: true }
+      );
+    }
 
     const refreshedData = await buildTeacherBaseData(teacherId);
 
     return NextResponse.json({
       success: true,
-      message: "Submission updated successfully",
+      message: updates.length === 1
+        ? "Submission updated successfully"
+        : "Submission updates saved successfully",
       data: refreshedData,
     });
   } catch (error) {

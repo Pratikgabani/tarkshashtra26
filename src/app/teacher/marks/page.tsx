@@ -1,13 +1,46 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import {
-  STUDENTS, SUBJECTS, ASSESSMENTS,
-  INITIAL_MARKS, computeSubjectPercentage,
-  type MarksMap,
-} from '@/src/lib/teacherData';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-// ─── Topbar (reusable inline) ────────────────────────────────────────────────
+type UiAssessmentId = 'ut1' | 'ut2' | 'mid';
+
+interface MarksPageData {
+  teacher: {
+    id: string;
+    name: string;
+    department: string;
+    email: string;
+  };
+  students: Array<{
+    id: string;
+    name: string;
+    studentId: string;
+    batch: string;
+    semester: number;
+    department: string;
+  }>;
+  subjects: Array<{
+    id: string;
+    name: string;
+    code: string;
+    department: string;
+    semester: number;
+  }>;
+  assessments: Array<{
+    id: UiAssessmentId;
+    label: string;
+    maxMarks: number;
+  }>;
+  marks: Record<string, Record<string, Record<UiAssessmentId, number | null>>>;
+}
+
+interface MarkUpdate {
+  studentId: string;
+  subjectId: string;
+  assessmentId: UiAssessmentId;
+  marks: number | null;
+}
+
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
@@ -19,24 +52,102 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-// ─── Cell Editor ─────────────────────────────────────────────────────────────
+function splitCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      cells.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function normalizeHeader(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function mapHeaderToAssessment(header: string): UiAssessmentId | null {
+  const normalized = normalizeHeader(header);
+  if (normalized === 'ut1' || normalized === 'unittest1' || normalized === 'unittest1') return 'ut1';
+  if (normalized === 'ut2' || normalized === 'unittest2' || normalized === 'unittest2') return 'ut2';
+  if (normalized === 'mid' || normalized === 'midterm') return 'mid';
+  return null;
+}
+
+function looksLikeObjectId(value: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(value);
+}
+
+function computeSubjectPercentage(
+  marks: Record<string, Record<string, Record<UiAssessmentId, number | null>>>,
+  studentId: string,
+  subjectId: string,
+  assessments: Array<{ id: UiAssessmentId; maxMarks: number }>
+): number {
+  const totalMax = assessments.reduce((sum, assessment) => sum + assessment.maxMarks, 0);
+  if (totalMax === 0) return 0;
+
+  const obtained = assessments.reduce((sum, assessment) => {
+    const value = marks[studentId]?.[subjectId]?.[assessment.id] ?? 0;
+    return sum + value;
+  }, 0);
+
+  return Math.round((obtained / totalMax) * 100);
+}
+
 function MarksCell({
-  value, maxMarks, onChange,
-}: { value: number | null; maxMarks: number; onChange: (v: number | null) => void }) {
+  value,
+  maxMarks,
+  onChange,
+}: {
+  value: number | null;
+  maxMarks: number;
+  onChange: (value: number | null) => void;
+}) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]   = useState(String(value ?? ''));
+  const [draft, setDraft] = useState(value === null ? '' : String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const pct = value != null ? (value / maxMarks) * 100 : null;
-  const isLow = pct != null && pct < 40;
+  const percentage = value === null ? null : (value / maxMarks) * 100;
+  const isLow = percentage !== null && percentage < 40;
 
   function commit() {
-    const num = draft.trim() === '' ? null : Number(draft);
-    if (num !== null && (isNaN(num) || num < 0 || num > maxMarks)) {
-      setDraft(String(value ?? ''));
-    } else {
-      onChange(num);
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      onChange(null);
+      setEditing(false);
+      return;
     }
+
+    const numeric = Number(trimmed);
+    if (Number.isNaN(numeric) || numeric < 0 || numeric > maxMarks) {
+      setDraft(value === null ? '' : String(value));
+      setEditing(false);
+      return;
+    }
+
+    onChange(numeric);
     setEditing(false);
   }
 
@@ -49,9 +160,15 @@ function MarksCell({
         min={0}
         max={maxMarks}
         value={draft}
-        onChange={e => setDraft(e.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false); } }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit();
+          if (event.key === 'Escape') {
+            setDraft(value === null ? '' : String(value));
+            setEditing(false);
+          }
+        }}
         className="w-16 px-1.5 py-0.5 border border-blue-500 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
     );
@@ -59,9 +176,13 @@ function MarksCell({
 
   return (
     <button
-      onClick={() => { setDraft(String(value ?? '')); setEditing(true); }}
-      className={`w-16 text-center px-1.5 py-1 rounded text-xs font-medium transition-colors hover:bg-blue-50 cursor-pointer border border-transparent hover:border-blue-200 ${
-        isLow ? 'text-red-600 bg-red-50' : value == null ? 'text-gray-300' : 'text-gray-700'
+      type="button"
+      onClick={() => {
+        setDraft(value === null ? '' : String(value));
+        setEditing(true);
+      }}
+      className={`w-16 text-center px-1.5 py-1 rounded text-xs font-medium transition-colors hover:bg-blue-50 border border-transparent hover:border-blue-200 ${
+        isLow ? 'text-red-600 bg-red-50' : value === null ? 'text-gray-300' : 'text-gray-700'
       }`}
     >
       {value ?? '—'}
@@ -69,174 +190,495 @@ function MarksCell({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-export default function MarksEntryPage() {
-  const [marks, setMarks]          = useState<MarksMap>(INITIAL_MARKS);
-  const [activeSubject, setActive] = useState(SUBJECTS[0].id);
-  const [filterBelow, setFilter]   = useState(false);
-  const [batchFilter, setBatch]    = useState<'All' | 'CE-A' | 'CE-B'>('All');
-  const [saved, setSaved]          = useState(false);
-  const [errors, setErrors]        = useState<string[]>([]);
+export default function TeacherMarksPage() {
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [data, setData] = useState<MarksPageData | null>(null);
+  const [editableMarks, setEditableMarks] = useState<MarksPageData['marks']>({});
+  const [originalMarks, setOriginalMarks] = useState<MarksPageData['marks']>({});
+  const [activeSubjectId, setActiveSubjectId] = useState('');
+  const [batchFilter, setBatchFilter] = useState<'All' | string>('All');
+  const [belowFilter, setBelowFilter] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  const subject = SUBJECTS.find(s => s.id === activeSubject)!;
+  useEffect(() => {
+    let cancelled = false;
 
-  function updateMark(studentId: string, assessmentId: string, value: number | null) {
-    setMarks(prev => ({
+    async function loadMarks() {
+      try {
+        const response = await fetch('/api/teacher/marks', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          const payload = json.data as MarksPageData;
+          setData(payload);
+          setEditableMarks(payload.marks || {});
+          setOriginalMarks(payload.marks || {});
+          setError('');
+        } else if (!cancelled) {
+          setError(json?.message || 'Failed to load marks data');
+          setData(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Failed to load marks data');
+          setData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadMarks();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  const activeSubject = useMemo(() => {
+    if (!data || data.subjects.length === 0) return null;
+    return data.subjects.find((subject) => subject.id === activeSubjectId) || data.subjects[0];
+  }, [data, activeSubjectId]);
+
+  const filteredStudents = useMemo(() => {
+    if (!data || !activeSubject) return [];
+
+    return data.students.filter((student) => {
+      const batchMatch = batchFilter === 'All' || student.batch === batchFilter;
+      const percentage = computeSubjectPercentage(editableMarks, student.id, activeSubject.id, data.assessments);
+      const thresholdMatch = !belowFilter || percentage < 40;
+      return batchMatch && thresholdMatch;
+    });
+  }, [data, activeSubject, editableMarks, batchFilter, belowFilter]);
+
+  const dirtyCount = useMemo(() => {
+    if (!data || !activeSubject) return 0;
+
+    let changes = 0;
+    for (const student of data.students) {
+      for (const assessment of data.assessments) {
+        const before = originalMarks[student.id]?.[activeSubject.id]?.[assessment.id] ?? null;
+        const after = editableMarks[student.id]?.[activeSubject.id]?.[assessment.id] ?? null;
+        if (before !== after) {
+          changes += 1;
+        }
+      }
+    }
+    return changes;
+  }, [data, activeSubject, originalMarks, editableMarks]);
+
+  function updateCell(studentId: string, assessmentId: UiAssessmentId, value: number | null) {
+    if (!activeSubject) return;
+
+    setEditableMarks((prev) => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        [activeSubject]: {
-          ...prev[studentId]?.[activeSubject],
+        [activeSubject.id]: {
+          ...prev[studentId]?.[activeSubject.id],
           [assessmentId]: value,
         },
       },
     }));
-    setSaved(false);
+
+    setNotice('');
   }
 
-  function handleSave() {
-    // Validate: all entered marks within range (already validated in cell, but double-check)
-    const errs: string[] = [];
-    STUDENTS.forEach(s => {
-      ASSESSMENTS.forEach(a => {
-        const m = marks[s.id]?.[activeSubject]?.[a.id];
-        if (m != null && (m < 0 || m > a.maxMarks)) {
-          errs.push(`${s.name} — ${a.label}: ${m} exceeds max ${a.maxMarks}`);
+  async function saveChanges() {
+    if (!data || !activeSubject) return;
+
+    const updates: MarkUpdate[] = [];
+
+    for (const student of data.students) {
+      for (const assessment of data.assessments) {
+        const before = originalMarks[student.id]?.[activeSubject.id]?.[assessment.id] ?? null;
+        const after = editableMarks[student.id]?.[activeSubject.id]?.[assessment.id] ?? null;
+
+        if (before !== after) {
+          updates.push({
+            studentId: student.id,
+            subjectId: activeSubject.id,
+            assessmentId: assessment.id,
+            marks: after,
+          });
         }
+      }
+    }
+
+    if (updates.length === 0) {
+      setNotice('No changes to save.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/teacher/marks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
       });
-    });
-    if (errs.length) { setErrors(errs); return; }
-    setErrors([]);
-    setSaved(true);
-    // Simulate API save
-    console.log('Saving marks for subject', activeSubject, marks);
-    setTimeout(() => setSaved(false), 3000);
+      const json = await response.json();
+
+      if (response.ok && json?.success && json?.data) {
+        const payload = json.data as MarksPageData;
+        setData(payload);
+        setEditableMarks(payload.marks || {});
+        setOriginalMarks(payload.marks || {});
+        setNotice('Marks saved successfully.');
+      } else {
+        const details = Array.isArray(json?.errors) ? ` ${json.errors.join(' | ')}` : '';
+        setError((json?.message || 'Failed to save marks') + details);
+      }
+    } catch {
+      setError('Failed to save marks');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const filteredStudents = STUDENTS.filter(s => {
-    const batchOk = batchFilter === 'All' || s.batch === batchFilter;
-    const pct = computeSubjectPercentage(marks, s.id, activeSubject);
-    const threshOk = !filterBelow || pct < 40;
-    return batchOk && threshOk;
-  });
+  async function handleCsvUpload(file: File) {
+    if (!data) return;
 
-  // Compute averages per assessment
-  const assessmentAvgs = ASSESSMENTS.map(a => {
-    const vals = STUDENTS.map(s => marks[s.id]?.[activeSubject]?.[a.id]).filter(v => v != null) as number[];
-    return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length * 10) / 10 : null;
-  });
+    setUploading(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const content = await file.text();
+      const lines = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      if (lines.length < 2) {
+        setError('CSV file must contain a header and at least one data row.');
+        return;
+      }
+
+      const headerCells = splitCsvLine(lines[0]);
+      const headerMap = new Map<string, number>();
+      headerCells.forEach((header, index) => {
+        headerMap.set(normalizeHeader(header), index);
+      });
+
+      const studentCol =
+        headerMap.get('studentid') ??
+        headerMap.get('id') ??
+        headerMap.get('enrollment') ??
+        headerMap.get('enrolment');
+
+      const subjectCol =
+        headerMap.get('subjectid') ??
+        headerMap.get('subjectcode') ??
+        headerMap.get('subjectname') ??
+        headerMap.get('subject') ??
+        headerMap.get('code');
+
+      if (typeof studentCol !== 'number') {
+        setError('CSV header must include studentId (or id/enrollment).');
+        return;
+      }
+
+      if (!activeSubject && typeof subjectCol !== 'number') {
+        setError('CSV must include subjectId or subjectCode column when no subject is selected.');
+        return;
+      }
+
+      const assessmentColumns = new Map<UiAssessmentId, number>();
+      for (const [raw, index] of headerCells.map((h, i) => [h, i] as const)) {
+        const assessmentId = mapHeaderToAssessment(raw);
+        if (assessmentId) {
+          assessmentColumns.set(assessmentId, index);
+        }
+      }
+
+      if (assessmentColumns.size === 0) {
+        setError('CSV must contain at least one assessment column: ut1, ut2, or mid.');
+        return;
+      }
+
+      const studentIndex = new Map<string, string>();
+      for (const student of data.students) {
+        studentIndex.set(student.studentId.toLowerCase(), student.id);
+        studentIndex.set(student.id.toLowerCase(), student.id);
+      }
+
+      const subjectIndex = new Map<string, string>();
+      for (const subject of data.subjects) {
+        subjectIndex.set(subject.id.toLowerCase(), subject.id);
+        subjectIndex.set(subject.code.toLowerCase(), subject.id);
+        subjectIndex.set(subject.name.toLowerCase(), subject.id);
+      }
+
+      const updates: MarkUpdate[] = [];
+      const rowErrors: string[] = [];
+
+      for (let i = 1; i < lines.length; i += 1) {
+        const cells = splitCsvLine(lines[i]);
+        const studentKey = (cells[studentCol] || '').trim().toLowerCase();
+
+        if (!studentKey) {
+          rowErrors.push(`Row ${i + 1}: missing studentId.`);
+          continue;
+        }
+
+        const studentId = studentIndex.get(studentKey);
+        if (!studentId) {
+          rowErrors.push(`Row ${i + 1}: student '${cells[studentCol]}' not found.`);
+          continue;
+        }
+
+        let subjectId = activeSubject?.id || '';
+        if (!subjectId) {
+          const rawSubject = typeof subjectCol === 'number' ? (cells[subjectCol] || '').trim() : '';
+          if (!rawSubject) {
+            rowErrors.push(`Row ${i + 1}: missing subjectId/subjectCode.`);
+            continue;
+          }
+
+          const normalizedSubject = rawSubject.toLowerCase();
+          subjectId = subjectIndex.get(normalizedSubject) || '';
+
+          if (!subjectId && looksLikeObjectId(rawSubject)) {
+            subjectId = rawSubject;
+          }
+
+          if (!subjectId) {
+            rowErrors.push(`Row ${i + 1}: subject '${rawSubject}' not recognized.`);
+            continue;
+          }
+        }
+
+        for (const [assessmentId, columnIndex] of assessmentColumns.entries()) {
+          const raw = (cells[columnIndex] || '').trim();
+          if (!raw) continue;
+
+          const numeric = Number(raw);
+          const assessment = data.assessments.find((item) => item.id === assessmentId);
+
+          if (!assessment) continue;
+
+          if (Number.isNaN(numeric)) {
+            rowErrors.push(`Row ${i + 1}: invalid number '${raw}' for ${assessmentId}.`);
+            continue;
+          }
+
+          if (numeric < 0 || numeric > assessment.maxMarks) {
+            rowErrors.push(
+              `Row ${i + 1}: ${assessmentId} marks must be between 0 and ${assessment.maxMarks}.`
+            );
+            continue;
+          }
+
+          updates.push({
+            studentId,
+            subjectId,
+            assessmentId,
+            marks: numeric,
+          });
+        }
+      }
+
+      if (rowErrors.length > 0) {
+        setError(rowErrors.slice(0, 8).join(' '));
+        return;
+      }
+
+      if (updates.length === 0) {
+        setError('No valid rows were found in the CSV file.');
+        return;
+      }
+
+      const response = await fetch('/api/teacher/marks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+      const json = await response.json();
+
+      if (response.ok && json?.success && json?.data) {
+        const payload = json.data as MarksPageData;
+        setData(payload);
+        setEditableMarks(payload.marks || {});
+        setOriginalMarks(payload.marks || {});
+        setNotice(`CSV upload completed. ${updates.length} marks updated.`);
+      } else {
+        setError(json?.message || 'CSV upload failed.');
+      }
+    } catch {
+      setError('CSV upload failed. Please verify file format.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function triggerCsvUploadPicker() {
+    if (uploading) return;
+    setError('');
+    csvInputRef.current?.click();
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex flex-col flex-1">
+        <Topbar title="Marks Entry" subtitle="Unable to load marks module" />
+        <div className="p-6">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700">
+            {error || 'Something went wrong while loading marks data.'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1">
-      <Topbar title="Marks Entry" subtitle="Enter internal assessment marks per student. Click any cell to edit." />
+      <Topbar title="Marks Entry" subtitle="Enter marks, save updates, and use CSV mass upload" />
 
       <main className="flex-1 p-6 space-y-4">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+            {error}
+          </div>
+        )}
 
-        {/* ── Controls ──────────────────────────────────────────────── */}
+        {notice && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs font-semibold text-green-700">
+            {notice}
+          </div>
+        )}
+
         <div className="bg-white border border-gray-200 rounded-lg px-5 py-3 flex flex-wrap items-center gap-3">
-          {/* Subject tabs */}
           <div className="flex gap-1 border border-gray-200 rounded-md p-0.5 bg-gray-50">
-            {SUBJECTS.map(s => (
+            {data.subjects.map((subject) => (
               <button
-                key={s.id}
-                onClick={() => { setActive(s.id); setSaved(false); setErrors([]); }}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${activeSubject === s.id ? 'bg-white text-blue-700 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                key={subject.id}
+                type="button"
+                onClick={() => setActiveSubjectId(subject.id)}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  activeSubject?.id === subject.id
+                    ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                {s.name}
+                {subject.name}
               </button>
             ))}
           </div>
 
           <div className="h-5 w-px bg-gray-200" />
 
-          {/* Batch filter */}
           <div className="flex gap-1">
-            {(['All', 'CE-A', 'CE-B'] as const).map(b => (
-              <button key={b} onClick={() => setBatch(b)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${batchFilter === b ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                {b}
+            {['All', ...Array.from(new Set(data.students.map((student) => student.batch)))].map((batch) => (
+              <button
+                key={batch}
+                type="button"
+                onClick={() => setBatchFilter(batch)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  batchFilter === batch
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {batch}
               </button>
             ))}
           </div>
 
           <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-            <input type="checkbox" checked={filterBelow} onChange={e => setFilter(e.target.checked)} className="rounded" />
+            <input
+              type="checkbox"
+              checked={belowFilter}
+              onChange={(event) => setBelowFilter(event.target.checked)}
+              className="rounded"
+            />
             Show only below 40%
           </label>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* CSV upload (UI only) */}
-            <label className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors font-medium">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Bulk CSV Upload
-              <input type="file" accept=".csv" className="hidden" onChange={() => alert('CSV import: connect to backend API')} />
-            </label>
+            <button
+              type="button"
+              onClick={triggerCsvUploadPicker}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors font-medium disabled:opacity-50"
+            >
+              {uploading ? 'Uploading...' : 'Bulk CSV Upload'}
+            </button>
+
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void handleCsvUpload(file);
+                }
+                event.target.value = '';
+              }}
+            />
 
             <button
-              onClick={handleSave}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              type="button"
+              onClick={() => {
+                void saveChanges();
+              }}
+              disabled={saving || dirtyCount === 0 || !activeSubject}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {saved ? (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Saved
-                </>
-              ) : 'Save Marks'}
+              {saving ? 'Saving...' : `Save Marks (${dirtyCount})`}
             </button>
           </div>
         </div>
 
-        {/* ── Errors ────────────────────────────────────────────────── */}
-        {errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-            <p className="text-xs font-semibold text-red-700 mb-1">Validation Errors — please fix before saving:</p>
-            {errors.map((e, i) => <p key={i} className="text-xs text-red-600">• {e}</p>)}
-          </div>
-        )}
-
-        {/* ── Legend ────────────────────────────────────────────────── */}
         <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-red-100 border border-red-200" />
-            Below 40% — needs attention
+          <span className="text-gray-400">
+            Subject: <strong className="text-gray-700">{activeSubject?.name || 'N/A'}</strong>
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-blue-50 border border-blue-200" />
-            Click any cell to edit
+          <span>Showing {filteredStudents.length} students</span>
+          <span>
+            {filteredStudents.filter((student) => activeSubject && computeSubjectPercentage(editableMarks, student.id, activeSubject.id, data.assessments) < 40).length} below threshold
           </span>
-          <span className="text-gray-400">Subject: <strong className="text-gray-700">{subject.name}</strong> ({subject.code}) · Max Total: 100 marks</span>
         </div>
 
-        {/* ── Spreadsheet Table ──────────────────────────────────────── */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="overflow-auto max-h-[calc(100vh-280px)]">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
-                {/* Header row 1 — subject label */}
                 <tr className="bg-blue-600">
-                  <th colSpan={2} className="px-4 py-2 text-left text-xs font-semibold text-white">{subject.name} — {subject.code}</th>
-                  {ASSESSMENTS.map(a => (
-                    <th key={a.id} colSpan={1} className="px-3 py-2 text-center text-xs font-semibold text-blue-100">
-                      {a.label}<br /><span className="font-normal text-blue-200">Max: {a.maxMarks}</span>
+                  <th colSpan={2} className="px-4 py-2 text-left text-xs font-semibold text-white">
+                    {activeSubject ? `${activeSubject.name} — ${activeSubject.code}` : 'Subject'}
+                  </th>
+                  {data.assessments.map((assessment) => (
+                    <th key={assessment.id} className="px-3 py-2 text-center text-xs font-semibold text-blue-100">
+                      {assessment.label}
+                      <br />
+                      <span className="font-normal text-blue-200">Max: {assessment.maxMarks}</span>
                     </th>
                   ))}
                   <th className="px-3 py-2 text-center text-xs font-semibold text-blue-100">Total %</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold text-blue-100">Status</th>
-                </tr>
-                {/* Averages row */}
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <td colSpan={2} className="px-4 py-1.5 text-xs text-gray-500 font-semibold">Class Average</td>
-                  {assessmentAvgs.map((avg, i) => (
-                    <td key={i} className="px-3 py-1.5 text-xs text-center font-semibold text-blue-700">
-                      {avg ?? '—'}
-                    </td>
-                  ))}
-                  <td className="px-3 py-1.5 text-xs text-center font-semibold text-blue-700">
-                    {Math.round(filteredStudents.reduce((acc, s) => acc + computeSubjectPercentage(marks, s.id, activeSubject), 0) / (filteredStudents.length || 1))}%
-                  </td>
-                  <td />
                 </tr>
               </thead>
               <tbody>
@@ -247,41 +689,42 @@ export default function MarksEntryPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((s, idx) => {
-                    const pct = computeSubjectPercentage(marks, s.id, activeSubject);
-                    const isBelow = pct < 40;
+                  filteredStudents.map((student, index) => {
+                    const percentage = activeSubject
+                      ? computeSubjectPercentage(editableMarks, student.id, activeSubject.id, data.assessments)
+                      : 0;
+                    const isBelow = percentage < 40;
+
                     return (
-                      <tr key={s.id} className={`border-b border-gray-50 ${isBelow ? 'bg-red-50/50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                      <tr key={student.id} className={`border-b border-gray-50 ${isBelow ? 'bg-red-50/50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                         <td className="px-4 py-2.5 w-40">
-                          <p className="text-xs font-semibold text-gray-800">{s.name}</p>
-                          <p className="text-xs text-gray-400">{s.id.toUpperCase()} · {s.batch}</p>
+                          <p className="text-xs font-semibold text-gray-800">{student.name}</p>
+                          <p className="text-xs text-gray-400">{student.studentId}</p>
                         </td>
                         <td className="px-3 py-2.5 w-16">
-                          <span className="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{s.batch}</span>
+                          <span className="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{student.batch}</span>
                         </td>
-                        {ASSESSMENTS.map(a => (
-                          <td key={a.id} className="px-3 py-2.5 text-center">
+                        {data.assessments.map((assessment) => (
+                          <td key={assessment.id} className="px-3 py-2.5 text-center">
                             <MarksCell
-                              value={marks[s.id]?.[activeSubject]?.[a.id] ?? null}
-                              maxMarks={a.maxMarks}
-                              onChange={v => updateMark(s.id, a.id, v)}
+                              value={activeSubject ? editableMarks[student.id]?.[activeSubject.id]?.[assessment.id] ?? null : null}
+                              maxMarks={assessment.maxMarks}
+                              onChange={(value) => updateCell(student.id, assessment.id, value)}
                             />
                           </td>
                         ))}
                         <td className="px-3 py-2.5 text-center">
-                          <span className={`text-xs font-bold ${isBelow ? 'text-red-600' : pct >= 75 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-orange-600'}`}>
-                            {pct}%
+                          <span className={`text-xs font-bold ${isBelow ? 'text-red-600' : percentage >= 75 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-orange-600'}`}>
+                            {percentage}%
                           </span>
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           {isBelow ? (
                             <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded px-1.5 py-0.5 font-semibold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                               Below Threshold
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5 font-semibold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                               Passing
                             </span>
                           )}
@@ -293,14 +736,7 @@ export default function MarksEntryPage() {
               </tbody>
             </table>
           </div>
-          {/* Footer stats */}
-          <div className="px-5 py-2.5 border-t border-gray-100 bg-gray-50 flex items-center gap-6 text-xs text-gray-500">
-            <span>Showing <strong className="text-gray-700">{filteredStudents.length}</strong> of {STUDENTS.length} students</span>
-            <span><strong className="text-red-600">{filteredStudents.filter(s => computeSubjectPercentage(marks, s.id, activeSubject) < 40).length}</strong> below 40% threshold</span>
-            <span className="ml-auto text-gray-400">Press Esc to cancel edit · Enter to confirm</span>
-          </div>
         </div>
-
       </main>
     </div>
   );

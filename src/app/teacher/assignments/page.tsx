@@ -1,11 +1,49 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  STUDENTS, SUBJECTS, ASSIGNMENTS,
-  INITIAL_SUBMISSIONS,
-  type Assignment, type SubmissionStatus, type SubmissionsMap,
-} from '@/src/lib/teacherData';
+import { useEffect, useMemo, useState } from 'react';
+
+type UiSubmissionStatus = 'On Time' | 'Late' | 'Not Submitted';
+
+interface AssignmentsPageData {
+  teacher: {
+    id: string;
+    name: string;
+    department: string;
+    email: string;
+  };
+  students: Array<{
+    id: string;
+    name: string;
+    studentId: string;
+    batch: string;
+    semester: number;
+  }>;
+  subjects: Array<{
+    id: string;
+    name: string;
+    code: string;
+    department: string;
+    semester: number;
+  }>;
+  assignments: Array<{
+    id: string;
+    subjectId: string;
+    title: string;
+    description: string;
+    dueDate: string;
+    maxMarks: number;
+  }>;
+  submissions: Record<string, Record<string, { status: UiSubmissionStatus; marks: number | null }>>;
+  flags: Record<string, { note: string; flaggedAt: string }>;
+}
+
+interface AssignmentCreateForm {
+  title: string;
+  description: string;
+  subjectId: string;
+  dueDate: string;
+  maxMarks: number;
+}
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -18,11 +56,19 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-// ─── Flag Modal ───────────────────────────────────────────────────────────────
 function FlagModal({
-  studentName, onClose, onSubmit,
-}: { studentName: string; onClose: () => void; onSubmit: (note: string) => void }) {
+  studentName,
+  onClose,
+  onSubmit,
+  submitting,
+}: {
+  studentName: string;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+  submitting: boolean;
+}) {
   const [note, setNote] = useState('');
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
@@ -32,14 +78,16 @@ function FlagModal({
         </div>
         <div className="p-6 space-y-4">
           <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5 text-xs text-orange-700">
-            ⚠ This flag will appear on the faculty mentor&apos;s dashboard and trigger a notification.
+            This flag creates a mentor alert and appears on mentor dashboard.
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Note for Mentor <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Note for Mentor <span className="text-red-500">*</span>
+            </label>
             <textarea
               value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="e.g. Student appears disengaged. Multiple assignments not submitted..."
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Reason for flag..."
               rows={4}
               maxLength={500}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
@@ -48,15 +96,21 @@ function FlagModal({
           </div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50"
+            disabled={submitting}
+          >
             Cancel
           </button>
           <button
-            onClick={() => { if (note.trim()) { onSubmit(note.trim()); onClose(); } }}
-            disabled={!note.trim()}
-            className="px-4 py-1.5 bg-orange-600 text-white rounded text-xs font-semibold hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            type="button"
+            onClick={() => onSubmit(note.trim())}
+            disabled={submitting || note.trim().length < 5}
+            className="px-4 py-1.5 bg-orange-600 text-white rounded text-xs font-semibold hover:bg-orange-700 disabled:opacity-50"
           >
-            Submit Flag
+            {submitting ? 'Submitting...' : 'Submit Flag'}
           </button>
         </div>
       </div>
@@ -64,319 +118,637 @@ function FlagModal({
   );
 }
 
-// ─── Create Assignment Modal ──────────────────────────────────────────────────
 function CreateAssignmentModal({
-  onClose, onSave,
-}: { onClose: () => void; onSave: (a: Assignment) => void }) {
-  const [form, setForm] = useState({
-    title: '', description: '', subjectId: SUBJECTS[0].id,
-    dueDate: '', maxMarks: 20,
+  subjects,
+  onClose,
+  onSave,
+  saving,
+}: {
+  subjects: Array<{ id: string; name: string }>;
+  onClose: () => void;
+  onSave: (form: AssignmentCreateForm) => void;
+  saving: boolean;
+}) {
+  const [form, setForm] = useState<AssignmentCreateForm>({
+    title: '',
+    description: '',
+    subjectId: subjects[0]?.id || '',
+    dueDate: '',
+    maxMarks: 20,
   });
-  const [errors, setErrors] = useState<Partial<typeof form>>({});
-
-  function validate() {
-    const e: Partial<typeof form> = {};
-    if (!form.title.trim())       { e.title = 'Required'; }
-    if (!form.description.trim()) { e.description = 'Required'; }
-    if (!form.dueDate)            { e.dueDate = 'Required'; }
-    if (form.maxMarks < 1 || form.maxMarks > 100) { e.maxMarks = 'Must be 1–100' as unknown as number; }
-    return e;
-  }
-
-  function handleSave() {
-    const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    const newA: Assignment = {
-      id: 'a' + Date.now(),
-      title: form.title.trim(),
-      description: form.description.trim(),
-      subjectId: form.subjectId,
-      dueDate: form.dueDate,
-      maxMarks: form.maxMarks,
-    };
-    onSave(newA);
-    onClose();
-  }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-900">Create New Assignment</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
           </button>
         </div>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Title <span className="text-red-500">*</span></label>
-              <input
-                value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="e.g. Implementing AVL Tree"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.title ? 'border-red-400' : 'border-gray-300'}`}
-              />
-              {errors.title && <p className="text-xs text-red-500 mt-0.5">{errors.title}</p>}
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Title</label>
+            <input
+              value={form.title}
+              onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="Assignment title"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Description</label>
+            <textarea
+              value={form.description}
+              onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+              rows={3}
+              placeholder="Assignment description"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
-              <select value={form.subjectId} onChange={e => setForm(f => ({ ...f, subjectId: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Subject</label>
+              <select
+                value={form.subjectId}
+                onChange={(event) => setForm((prev) => ({ ...prev, subjectId: event.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Max Marks <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Due Date</label>
               <input
-                type="number" min={1} max={100} value={form.maxMarks}
-                onChange={e => setForm(f => ({ ...f, maxMarks: Number(e.target.value) }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="date"
+                value={form.dueDate}
+                onChange={(event) => setForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Due Date <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Max Marks</label>
               <input
-                type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.dueDate ? 'border-red-400' : 'border-gray-300'}`}
+                type="number"
+                min={1}
+                max={1000}
+                value={form.maxMarks}
+                onChange={(event) => setForm((prev) => ({ ...prev, maxMarks: Number(event.target.value) || 0 }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               />
-              {errors.dueDate && <p className="text-xs text-red-500 mt-0.5">{errors.dueDate}</p>}
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Description <span className="text-red-500">*</span></label>
-              <textarea
-                value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Describe the assignment task..."
-                rows={3} maxLength={500}
-                className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.description ? 'border-red-400' : 'border-gray-300'}`}
-              />
-              {errors.description && <p className="text-xs text-red-500 mt-0.5">{errors.description}</p>}
             </div>
           </div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-          <button onClick={handleSave} className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition-colors">Create Assignment</button>
+          <button type="button" onClick={onClose} className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50" disabled={saving}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(form)}
+            disabled={saving || !form.title.trim() || !form.subjectId || !form.dueDate || form.maxMarks < 1}
+            className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Creating...' : 'Create Assignment'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-export default function AssignmentsPage() {
-  const [assignments, setAssignments]   = useState<Assignment[]>(ASSIGNMENTS);
-  const [submissions, setSubmissions]   = useState<SubmissionsMap>(INITIAL_SUBMISSIONS);
-  const [selectedAssignmentId, setSelected] = useState(ASSIGNMENTS[0].id);
-  const [subjectFilter, setSubjectFilter]   = useState<string>('All');
-  const [statusFilter, setStatusFilter]     = useState<SubmissionStatus | 'All'>('All');
-  const [showCreateModal, setShowCreate]    = useState(false);
-  const [flagModal, setFlagModal]           = useState<{ studentId: string; name: string } | null>(null);
-  const [flags, setFlags]                   = useState<Record<string, string>>({});
-  const [saveNotice, setSaveNotice]         = useState('');
-  const [bulkStatus, setBulkStatus]         = useState<SubmissionStatus | ''>('');
+export default function TeacherAssignmentsPage() {
+  const [data, setData] = useState<AssignmentsPageData | null>(null);
+  const [editableSubmissions, setEditableSubmissions] = useState<AssignmentsPageData['submissions']>({});
+  const [originalSubmissions, setOriginalSubmissions] = useState<AssignmentsPageData['submissions']>({});
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | UiSubmissionStatus>('All');
+  const [bulkStatus, setBulkStatus] = useState<UiSubmissionStatus | ''>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [flagSubmitting, setFlagSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [flagTarget, setFlagTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const selectedAssignment = assignments.find(a => a.id === selectedAssignmentId)!;
+  useEffect(() => {
+    let cancelled = false;
 
-  const filteredAssignments = assignments.filter(a =>
-    subjectFilter === 'All' || a.subjectId === subjectFilter
-  );
+    async function loadAssignments() {
+      try {
+        const response = await fetch('/api/teacher/assignments', { cache: 'no-store' });
+        const json = await response.json();
 
-  function updateStatus(studentId: string, status: SubmissionStatus) {
-    setSubmissions(prev => ({
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          const payload = json.data as AssignmentsPageData;
+          setData(payload);
+          setEditableSubmissions(payload.submissions || {});
+          setOriginalSubmissions(payload.submissions || {});
+          setError('');
+        } else if (!cancelled) {
+          setError(json?.message || 'Failed to load assignments');
+          setData(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Failed to load assignments');
+          setData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadAssignments();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  const visibleAssignments = useMemo(() => {
+    if (!data) return [];
+    return data.assignments.filter((assignment) => subjectFilter === 'All' || assignment.subjectId === subjectFilter);
+  }, [data, subjectFilter]);
+
+  const selectedAssignment = useMemo(() => {
+    if (!data || visibleAssignments.length === 0) return null;
+
+    return visibleAssignments.find((assignment) => assignment.id === selectedAssignmentId)
+      || visibleAssignments[0]
+      || null;
+  }, [data, visibleAssignments, selectedAssignmentId]);
+
+  const rows = useMemo(() => {
+    if (!data || !selectedAssignment) return [];
+
+    return data.students
+      .map((student) => {
+        const record = editableSubmissions[selectedAssignment.id]?.[student.id] || {
+          status: 'Not Submitted' as UiSubmissionStatus,
+          marks: null,
+        };
+
+        return {
+          student,
+          status: record.status,
+          marks: record.marks,
+          isFlagged: Boolean(data.flags[student.id]),
+        };
+      })
+      .filter((row) => statusFilter === 'All' || row.status === statusFilter);
+  }, [data, selectedAssignment, editableSubmissions, statusFilter]);
+
+  const dirtyRowCount = useMemo(() => {
+    if (!data || !selectedAssignment) return 0;
+
+    let count = 0;
+    for (const student of data.students) {
+      const before = originalSubmissions[selectedAssignment.id]?.[student.id] || {
+        status: 'Not Submitted' as UiSubmissionStatus,
+        marks: null,
+      };
+      const after = editableSubmissions[selectedAssignment.id]?.[student.id] || {
+        status: 'Not Submitted' as UiSubmissionStatus,
+        marks: null,
+      };
+
+      if (before.status !== after.status || before.marks !== after.marks) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }, [data, selectedAssignment, originalSubmissions, editableSubmissions]);
+
+  const summary = useMemo(() => {
+    if (!selectedAssignment || !data) {
+      return { onTime: 0, late: 0, missing: 0 };
+    }
+
+    let onTime = 0;
+    let late = 0;
+    let missing = 0;
+
+    for (const student of data.students) {
+      const status = editableSubmissions[selectedAssignment.id]?.[student.id]?.status || 'Not Submitted';
+      if (status === 'On Time') onTime += 1;
+      else if (status === 'Late') late += 1;
+      else missing += 1;
+    }
+
+    return { onTime, late, missing };
+  }, [data, selectedAssignment, editableSubmissions]);
+
+  function updateRow(studentId: string, patch: Partial<{ status: UiSubmissionStatus; marks: number | null }>) {
+    if (!selectedAssignment) return;
+
+    setEditableSubmissions((prev) => ({
       ...prev,
-      [selectedAssignmentId]: {
-        ...prev[selectedAssignmentId],
+      [selectedAssignment.id]: {
+        ...prev[selectedAssignment.id],
         [studentId]: {
-          ...prev[selectedAssignmentId]?.[studentId],
-          status,
-          marks: status === 'Not Submitted' ? null : prev[selectedAssignmentId]?.[studentId]?.marks ?? null,
+          status: patch.status || prev[selectedAssignment.id]?.[studentId]?.status || 'Not Submitted',
+          marks: patch.marks !== undefined ? patch.marks : prev[selectedAssignment.id]?.[studentId]?.marks ?? null,
         },
       },
     }));
+
+    setNotice('');
   }
 
-  function updateMarks(studentId: string, marks: number | null) {
-    setSubmissions(prev => ({
-      ...prev,
-      [selectedAssignmentId]: {
-        ...prev[selectedAssignmentId],
-        [studentId]: { ...prev[selectedAssignmentId]?.[studentId], marks },
-      },
-    }));
+  async function saveChanges() {
+    if (!data || !selectedAssignment) return;
+
+    const updates = data.students
+      .map((student) => {
+        const before = originalSubmissions[selectedAssignment.id]?.[student.id] || {
+          status: 'Not Submitted' as UiSubmissionStatus,
+          marks: null,
+        };
+        const after = editableSubmissions[selectedAssignment.id]?.[student.id] || {
+          status: 'Not Submitted' as UiSubmissionStatus,
+          marks: null,
+        };
+
+        if (before.status === after.status && before.marks === after.marks) {
+          return null;
+        }
+
+        return {
+          assignmentId: selectedAssignment.id,
+          studentId: student.id,
+          status: after.status,
+          marks: after.status === 'Not Submitted' ? null : after.marks,
+        };
+      })
+      .filter((item) => item !== null);
+
+    if (updates.length === 0) {
+      setNotice('No submission changes to save.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/teacher/assignments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+      const json = await response.json();
+
+      if (response.ok && json?.success && json?.data) {
+        const payload = json.data as AssignmentsPageData;
+        setData(payload);
+        setEditableSubmissions(payload.submissions || {});
+        setOriginalSubmissions(payload.submissions || {});
+        setNotice('Submission updates saved successfully.');
+      } else {
+        const details = Array.isArray(json?.errors) ? ` ${json.errors.join(' | ')}` : '';
+        setError((json?.message || 'Failed to save submission updates') + details);
+      }
+    } catch {
+      setError('Failed to save submission updates');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleBulkUpdate() {
-    if (!bulkStatus) return;
-    const updated: SubmissionsMap[string] = {};
-    STUDENTS.forEach(s => {
-      updated[s.id] = {
-        status: bulkStatus,
-        marks: bulkStatus === 'Not Submitted' ? null : submissions[selectedAssignmentId]?.[s.id]?.marks ?? null,
-      };
-    });
-    setSubmissions(prev => ({ ...prev, [selectedAssignmentId]: updated }));
-    setBulkStatus('');
+  async function applyBulkStatus() {
+    if (!selectedAssignment || !bulkStatus) return;
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/teacher/assignments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignmentId: selectedAssignment.id,
+          status: bulkStatus,
+          marksBehavior: bulkStatus === 'Not Submitted' ? 'clear' : 'keep',
+        }),
+      });
+      const json = await response.json();
+
+      if (response.ok && json?.success && json?.data) {
+        const payload = json.data as AssignmentsPageData;
+        setData(payload);
+        setEditableSubmissions(payload.submissions || {});
+        setOriginalSubmissions(payload.submissions || {});
+        setNotice('Bulk status update applied.');
+        setBulkStatus('');
+      } else {
+        setError(json?.message || 'Failed to apply bulk status update');
+      }
+    } catch {
+      setError('Failed to apply bulk status update');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleSave() {
-    setSaveNotice('Changes saved successfully.');
-    setTimeout(() => setSaveNotice(''), 3000);
+  async function createAssignment(form: AssignmentCreateForm) {
+    if (!data) return;
+
+    setCreating(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/teacher/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const json = await response.json();
+
+      if (response.ok && json?.success && json?.data) {
+        const payload = json.data as AssignmentsPageData;
+        setData(payload);
+        setEditableSubmissions(payload.submissions || {});
+        setOriginalSubmissions(payload.submissions || {});
+        setShowCreateModal(false);
+
+        if (json.assignmentId) {
+          setSelectedAssignmentId(String(json.assignmentId));
+        }
+
+        setNotice('Assignment created successfully.');
+      } else {
+        setError(json?.message || 'Failed to create assignment');
+      }
+    } catch {
+      setError('Failed to create assignment');
+    } finally {
+      setCreating(false);
+    }
   }
 
-  // Stats for selected assignment
-  const subRecs = submissions[selectedAssignmentId] ?? {};
-  const onTime  = STUDENTS.filter(s => subRecs[s.id]?.status === 'On Time').length;
-  const late    = STUDENTS.filter(s => subRecs[s.id]?.status === 'Late').length;
-  const missing = STUDENTS.filter(s => !subRecs[s.id] || subRecs[s.id]?.status === 'Not Submitted').length;
+  async function submitFlag(note: string) {
+    if (!flagTarget || note.length < 5) {
+      setError('Flag note must be at least 5 characters.');
+      return;
+    }
 
-  const displayStudents = STUDENTS.filter(s => {
-    const rec = subRecs[s.id];
-    const status = rec?.status ?? 'Not Submitted';
-    return statusFilter === 'All' || status === statusFilter;
-  });
+    setFlagSubmitting(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/teacher/flags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: flagTarget.id,
+          note,
+        }),
+      });
+      const json = await response.json();
+
+      if (response.ok && json?.success) {
+        setNotice('Student flagged successfully. Mentor dashboard will show this alert.');
+        setFlagTarget(null);
+
+        if (json?.data?.flags && data) {
+          setData({ ...data, flags: json.data.flags as AssignmentsPageData['flags'] });
+        }
+      } else {
+        setError(json?.message || 'Failed to submit flag');
+      }
+    } catch {
+      setError('Failed to submit flag');
+    } finally {
+      setFlagSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex flex-col flex-1">
+        <Topbar title="Assignment Management" subtitle="Unable to load assignment module" />
+        <div className="p-6">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700">
+            {error || 'Something went wrong while loading assignment data.'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1">
-      <Topbar title="Assignment Management" subtitle="Create assignments, track submissions, and flag students." />
+      <Topbar title="Assignment Management" subtitle="Create assignments, track statuses, and flag students to mentors" />
 
       {showCreateModal && (
         <CreateAssignmentModal
-          onClose={() => setShowCreate(false)}
-          onSave={a => {
-            setAssignments(prev => [...prev, a]);
-            setSelected(a.id);
+          subjects={data.subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+          onClose={() => setShowCreateModal(false)}
+          onSave={(form) => {
+            void createAssignment(form);
           }}
+          saving={creating}
         />
       )}
-      {flagModal && (
+
+      {flagTarget && (
         <FlagModal
-          studentName={flagModal.name}
-          onClose={() => setFlagModal(null)}
-          onSubmit={note => setFlags(f => ({ ...f, [flagModal.studentId]: note }))}
+          studentName={flagTarget.name}
+          onClose={() => setFlagTarget(null)}
+          onSubmit={(note) => {
+            void submitFlag(note);
+          }}
+          submitting={flagSubmitting}
         />
       )}
 
       <main className="flex-1 flex overflow-hidden">
-        {/* ── Left: Assignment List ────────────────────────────────── */}
         <aside className="w-72 bg-white border-r border-gray-200 flex flex-col shrink-0">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Assignments</p>
-            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+            >
               New
             </button>
           </div>
 
-          {/* Subject filter */}
           <div className="px-4 py-2 border-b border-gray-100">
-            <select value={subjectFilter} onChange={e => setSubjectFilter(e.target.value)}
-              className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select
+              value={subjectFilter}
+              onChange={(event) => setSubjectFilter(event.target.value)}
+              className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700"
+            >
               <option value="All">All Subjects</option>
-              {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {data.subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>{subject.name}</option>
+              ))}
             </select>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {filteredAssignments.map(a => {
-              const sub = SUBJECTS.find(s => s.id === a.subjectId);
-              const recs = submissions[a.id] ?? {};
-              const subRate = Math.round((STUDENTS.filter(s => recs[s.id]?.status !== 'Not Submitted' && recs[s.id]).length / STUDENTS.length) * 100);
-              const isSelected = a.id === selectedAssignmentId;
-              const today = new Date('2026-04-18');
-              const overdue = new Date(a.dueDate) < today;
+            {visibleAssignments.map((assignment) => {
+              const subject = data.subjects.find((item) => item.id === assignment.subjectId);
+              const records = editableSubmissions[assignment.id] || {};
+              const submitted = data.students.filter((student) => {
+                const status = records[student.id]?.status || 'Not Submitted';
+                return status !== 'Not Submitted';
+              }).length;
+              const submissionRate = data.students.length > 0 ? Math.round((submitted / data.students.length) * 100) : 0;
+              const selected = selectedAssignment?.id === assignment.id;
 
               return (
                 <button
-                  key={a.id}
-                  onClick={() => setSelected(a.id)}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 border-l-2 border-l-blue-600' : 'border-l-2 border-l-transparent'}`}
+                  type="button"
+                  key={assignment.id}
+                  onClick={() => setSelectedAssignmentId(assignment.id)}
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
+                    selected ? 'bg-blue-50 border-l-2 border-l-blue-600' : 'border-l-2 border-l-transparent'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold text-gray-800 leading-snug">{a.title}</p>
-                    {overdue && <span className="shrink-0 text-xs text-red-600 font-semibold">Due</span>}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{sub?.name} · Max {a.maxMarks}pts</p>
+                  <p className="text-xs font-semibold text-gray-800 leading-snug">{assignment.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{subject?.name || assignment.subjectId} · Max {assignment.maxMarks}</p>
                   <div className="flex items-center gap-2 mt-1.5">
                     <div className="flex-1 h-1 bg-gray-200 rounded-full">
-                      <div className="h-1 bg-green-500 rounded-full" style={{ width: `${subRate}%` }} />
+                      <div className="h-1 bg-green-500 rounded-full" style={{ width: `${submissionRate}%` }} />
                     </div>
-                    <span className="text-xs text-gray-500 font-medium">{subRate}%</span>
+                    <span className="text-xs text-gray-500 font-medium">{submissionRate}%</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">Due: {a.dueDate}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Due: {assignment.dueDate}</p>
                 </button>
               );
             })}
+
+            {visibleAssignments.length === 0 && (
+              <div className="p-4 text-xs text-gray-400">No assignments available for this filter.</div>
+            )}
           </div>
         </aside>
 
-        {/* ── Right: Submission Table ──────────────────────────────── */}
         <div className="flex-1 overflow-auto flex flex-col">
+          {error && (
+            <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+              {error}
+            </div>
+          )}
+
+          {notice && (
+            <div className="m-4 rounded-lg border border-green-200 bg-green-50 p-3 text-xs font-semibold text-green-700">
+              {notice}
+            </div>
+          )}
+
           {selectedAssignment ? (
             <>
-              {/* Assignment header */}
               <div className="bg-white border-b border-gray-200 px-6 py-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900">{selectedAssignment.title}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">{selectedAssignment.description}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span>Subject: <strong className="text-gray-700">{SUBJECTS.find(s => s.id === selectedAssignment.subjectId)?.name}</strong></span>
+                      <span>
+                        Subject:{' '}
+                        <strong className="text-gray-700">
+                          {data.subjects.find((subject) => subject.id === selectedAssignment.subjectId)?.name || selectedAssignment.subjectId}
+                        </strong>
+                      </span>
                       <span>Due: <strong className="text-gray-700">{selectedAssignment.dueDate}</strong></span>
                       <span>Max Marks: <strong className="text-gray-700">{selectedAssignment.maxMarks}</strong></span>
                     </div>
                   </div>
-                  <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition-colors">
-                    Save Changes
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void saveChanges();
+                    }}
+                    disabled={saving || dirtyRowCount === 0}
+                    className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : `Save Changes (${dirtyRowCount})`}
                   </button>
                 </div>
 
-                {/* Save notice */}
-                {saveNotice && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    {saveNotice}
-                  </div>
-                )}
-
-                {/* Summary bar */}
                 <div className="flex gap-4 mt-3">
-                  {[
-                    { label: 'On Time',       count: onTime,  color: 'text-green-700 bg-green-50 border-green-200' },
-                    { label: 'Late',           count: late,    color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
-                    { label: 'Not Submitted',  count: missing, color: 'text-red-700 bg-red-50 border-red-200' },
-                  ].map(b => (
-                    <span key={b.label} className={`px-2.5 py-1 rounded border text-xs font-semibold ${b.color}`}>
-                      {b.count} {b.label}
-                    </span>
-                  ))}
+                  <span className="px-2.5 py-1 rounded border text-xs font-semibold text-green-700 bg-green-50 border-green-200">
+                    {summary.onTime} On Time
+                  </span>
+                  <span className="px-2.5 py-1 rounded border text-xs font-semibold text-yellow-700 bg-yellow-50 border-yellow-200">
+                    {summary.late} Late
+                  </span>
+                  <span className="px-2.5 py-1 rounded border text-xs font-semibold text-red-700 bg-red-50 border-red-200">
+                    {summary.missing} Not Submitted
+                  </span>
                 </div>
               </div>
 
-              {/* Controls */}
               <div className="bg-gray-50 border-b border-gray-200 px-6 py-2 flex items-center gap-3">
                 <div className="flex gap-1">
-                  {(['All', 'On Time', 'Late', 'Not Submitted'] as const).map(f => (
-                    <button key={f} onClick={() => setStatusFilter(f)}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${statusFilter === f ? 'bg-gray-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                      {f}
+                  {(['All', 'On Time', 'Late', 'Not Submitted'] as const).map((item) => (
+                    <button
+                      type="button"
+                      key={item}
+                      onClick={() => setStatusFilter(item)}
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        statusFilter === item
+                          ? 'bg-gray-700 text-white'
+                          : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item}
                     </button>
                   ))}
                 </div>
+
                 <div className="ml-auto flex items-center gap-2 text-xs">
                   <span className="text-gray-500">Bulk update:</span>
-                  <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as SubmissionStatus | '')}
-                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <select
+                    value={bulkStatus}
+                    onChange={(event) => setBulkStatus(event.target.value as UiSubmissionStatus | '')}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs"
+                  >
                     <option value="">Select status...</option>
-                    <option>On Time</option><option>Late</option><option>Not Submitted</option>
+                    <option value="On Time">On Time</option>
+                    <option value="Late">Late</option>
+                    <option value="Not Submitted">Not Submitted</option>
                   </select>
-                  <button onClick={handleBulkUpdate} disabled={!bulkStatus}
-                    className="px-3 py-1 bg-gray-700 text-white rounded text-xs font-medium disabled:opacity-40 hover:bg-gray-800 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyBulkStatus();
+                    }}
+                    disabled={saving || !bulkStatus}
+                    className="px-3 py-1 bg-gray-700 text-white rounded text-xs font-medium disabled:opacity-40"
+                  >
                     Apply to All
                   </button>
                 </div>
               </div>
 
-              {/* Table */}
               <div className="overflow-auto flex-1">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
@@ -384,81 +756,104 @@ export default function AssignmentsPage() {
                       <th className="px-5 py-2.5 text-left text-xs font-semibold text-gray-500">Student</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Batch</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Marks <span className="text-gray-400 font-normal">/ {selectedAssignment.maxMarks}</span></th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">
+                        Marks <span className="text-gray-400 font-normal">/ {selectedAssignment.maxMarks}</span>
+                      </th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">%</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Flag</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayStudents.map((s, i) => {
-                      const rec = subRecs[s.id] ?? { status: 'Not Submitted' as SubmissionStatus, marks: null };
-                      const isFlagged = !!flags[s.id];
-                      const pct = rec.marks != null ? Math.round((rec.marks / selectedAssignment.maxMarks) * 100) : null;
+                    {rows.map((row, index) => {
+                      const percentage = row.marks !== null
+                        ? Math.round((row.marks / selectedAssignment.maxMarks) * 100)
+                        : null;
+
                       return (
-                        <tr key={s.id} className={`border-b border-gray-50 ${rec.status === 'Not Submitted' ? 'bg-red-50/30' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                        <tr key={row.student.id} className={`border-b border-gray-50 ${row.status === 'Not Submitted' ? 'bg-red-50/30' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                           <td className="px-5 py-2.5">
-                            <div className="flex items-center gap-2">
-                              {isFlagged && (
-                                <span title={flags[s.id]} className="text-orange-500 text-xs">⚠</span>
-                              )}
-                              <div>
-                                <p className="text-xs font-semibold text-gray-800">{s.name}</p>
-                                <p className="text-xs text-gray-400">{s.id.toUpperCase()}</p>
-                              </div>
+                            <div>
+                              <p className="text-xs font-semibold text-gray-800">{row.student.name}</p>
+                              <p className="text-xs text-gray-400">{row.student.studentId}</p>
                             </div>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-500">{s.batch}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-500">{row.student.batch}</td>
                           <td className="px-4 py-2.5">
                             <select
-                              value={rec.status}
-                              onChange={e => updateStatus(s.id, e.target.value as SubmissionStatus)}
-                              className={`border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer ${
-                                rec.status === 'On Time' ? 'border-green-200 text-green-700 bg-green-50' :
-                                rec.status === 'Late'    ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
-                                'border-red-200 text-red-700 bg-red-50'
+                              value={row.status}
+                              onChange={(event) => {
+                                const next = event.target.value as UiSubmissionStatus;
+                                updateRow(row.student.id, {
+                                  status: next,
+                                  marks: next === 'Not Submitted' ? null : row.marks,
+                                });
+                              }}
+                              className={`border rounded px-2 py-1 text-xs font-medium ${
+                                row.status === 'On Time'
+                                  ? 'border-green-200 text-green-700 bg-green-50'
+                                  : row.status === 'Late'
+                                    ? 'border-yellow-200 text-yellow-700 bg-yellow-50'
+                                    : 'border-red-200 text-red-700 bg-red-50'
                               }`}
                             >
-                              <option>On Time</option>
-                              <option>Late</option>
-                              <option>Not Submitted</option>
+                              <option value="On Time">On Time</option>
+                              <option value="Late">Late</option>
+                              <option value="Not Submitted">Not Submitted</option>
                             </select>
                           </td>
                           <td className="px-4 py-2.5">
-                            {rec.status !== 'Not Submitted' ? (
+                            {row.status !== 'Not Submitted' ? (
                               <input
-                                type="number" min={0} max={selectedAssignment.maxMarks}
-                                value={rec.marks ?? ''}
-                                onChange={e => {
-                                  const v = e.target.value === '' ? null : Number(e.target.value);
-                                  if (v === null || (v >= 0 && v <= selectedAssignment.maxMarks)) updateMarks(s.id, v);
+                                type="number"
+                                min={0}
+                                max={selectedAssignment.maxMarks}
+                                value={row.marks ?? ''}
+                                onChange={(event) => {
+                                  const raw = event.target.value;
+                                  const next = raw === '' ? null : Number(raw);
+                                  if (next === null || (!Number.isNaN(next) && next >= 0 && next <= selectedAssignment.maxMarks)) {
+                                    updateRow(row.student.id, { marks: next });
+                                  }
                                 }}
-                                className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                placeholder="—"
+                                className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs text-center"
                               />
                             ) : (
                               <span className="text-xs text-gray-300">—</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5">
-                            {pct != null ? (
-                              <span className={`text-xs font-bold ${pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{pct}%</span>
-                            ) : <span className="text-xs text-gray-300">—</span>}
+                            {percentage !== null ? (
+                              <span className={`text-xs font-bold ${percentage >= 70 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {percentage}%
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5">
-                            {isFlagged ? (
+                            {row.isFlagged ? (
                               <span className="text-xs text-orange-600 font-semibold">⚠ Flagged</span>
                             ) : (
                               <button
-                                onClick={() => setFlagModal({ studentId: s.id, name: s.name })}
-                                className="px-2 py-0.5 border border-orange-200 text-orange-600 rounded text-xs font-medium hover:bg-orange-50 transition-colors"
+                                type="button"
+                                onClick={() => setFlagTarget({ id: row.student.id, name: row.student.name })}
+                                className="px-2 py-0.5 border border-orange-200 text-orange-600 rounded text-xs font-medium hover:bg-orange-50"
                               >
-                                ⚑ Flag
+                                Flag
                               </button>
                             )}
                           </td>
                         </tr>
                       );
                     })}
+
+                    {rows.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">
+                          No students match current filters.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
