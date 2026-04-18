@@ -1,8 +1,36 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { MOCK_STUDENTS, DEPARTMENTS, CLASSES, RiskLevel } from '@/src/lib/coordinatorData';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter } from 'lucide-react';
+
+type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+
+type StudentRecord = {
+  id: string;
+  name: string;
+  department: string;
+  classBatch: string;
+  attendance: number;
+  avgMarks: number;
+  assignmentsCompleted: number;
+  totalAssignments: number;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  riskExplanation: string;
+};
+
+type StudentApiResponse = {
+  success: boolean;
+  data?: {
+    students: StudentRecord[];
+    total: number;
+    meta?: {
+      departments?: string[];
+      classes?: string[];
+    };
+  };
+  message?: string;
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -30,26 +58,77 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 }
 
 export default function CoordinatorStudents() {
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [classOptions, setClassOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
   const [filterRisk, setFilterRisk] = useState('All');
 
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/coordinator/at-risk', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch student monitoring data');
+        }
+
+        const json = (await response.json()) as StudentApiResponse;
+        if (!json.success || !json.data) {
+          throw new Error(json.message || 'Unable to load students');
+        }
+
+        setStudents(json.data.students);
+
+        if (json.data.meta?.departments) {
+          setDepartmentOptions(json.data.meta.departments);
+        }
+
+        if (json.data.meta?.classes) {
+          setClassOptions(json.data.meta.classes);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load students';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStudents();
+  }, []);
+
   const filteredStudents = useMemo(() => {
-    return MOCK_STUDENTS.filter(s => {
+    return students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchDept = filterDept === 'All' || s.department === filterDept;
       const matchClass = filterClass === 'All' || s.classBatch === filterClass;
       const matchRisk = filterRisk === 'All' || s.riskLevel === filterRisk;
       return matchSearch && matchDept && matchClass && matchRisk;
     });
-  }, [searchTerm, filterDept, filterClass, filterRisk]);
+  }, [students, searchTerm, filterDept, filterClass, filterRisk]);
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-hidden">
       <Topbar title="Student Monitoring" subtitle="Search, filter, and review individual student profiles and risk rationales" />
 
       <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-[1600px]">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold mb-6">
+            {error}
+          </div>
+        )}
         
         {/* Filters Bar */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-center justify-between shrink-0">
@@ -77,7 +156,7 @@ export default function CoordinatorStudents() {
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Departments</option>
-              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
             <select
               value={filterClass}
@@ -85,7 +164,7 @@ export default function CoordinatorStudents() {
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Classes</option>
-              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
               value={filterRisk}
@@ -115,7 +194,13 @@ export default function CoordinatorStudents() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
-                {filteredStudents.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-12 text-center text-sm font-medium text-[#6B7280]">
+                      Loading students...
+                    </td>
+                  </tr>
+                ) : filteredStudents.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-12 text-center text-sm font-medium text-[#6B7280]">
                       No students found matching your filters.
@@ -139,7 +224,9 @@ export default function CoordinatorStudents() {
                         <span className={`text-[13px] font-bold ${s.avgMarks < 40 ? 'text-[#EF4444]' : 'text-[#111827]'}`}>{s.avgMarks}</span>
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`text-[14px] font-black ${s.riskScore < 40 ? 'text-[#EF4444]' : s.riskScore < 60 ? 'text-[#F97316]' : 'text-[#10B981]'}`}>{s.riskScore}</span>
+                        <span className={`text-[14px] font-black ${s.riskLevel === 'Critical' ? 'text-[#EF4444]' : s.riskLevel === 'High' ? 'text-[#F97316]' : s.riskLevel === 'Medium' ? 'text-[#F59E0B]' : 'text-[#10B981]'}`}>
+                          {s.riskScore}
+                        </span>
                       </td>
                       <td className="px-5 py-4">
                         <RiskBadge level={s.riskLevel} />

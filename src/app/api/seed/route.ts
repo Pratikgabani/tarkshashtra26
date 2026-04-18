@@ -10,6 +10,7 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import LmsActivity from "@/src/models/lmsActivity";
 import RiskScore from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
+import Intervention from "@/src/models/intervention";
 
 function randomBetween(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -40,6 +41,7 @@ export async function POST() {
       LmsActivity.deleteMany({}),
       RiskScore.deleteMany({}),
       Alert.deleteMany({}),
+      Intervention.deleteMany({}),
     ]);
 
     const hashedPassword = await bcrypt.hash("password123", 10);
@@ -52,6 +54,8 @@ export async function POST() {
       password: hashedPassword,
       role: "mentor",
       department: "Computer Engineering",
+      isEmailVerified: true,
+      isActive: true,
     });
 
     // --- Create Teacher ---
@@ -61,6 +65,19 @@ export async function POST() {
       password: hashedPassword,
       role: "teacher",
       department: "Computer Engineering",
+      isEmailVerified: true,
+      isActive: true,
+    });
+
+    // --- Create Coordinator ---
+    const coordinator = await User.create({
+      fullName: "Dr. A. Coordinator",
+      email: "coordinator@college.edu",
+      password: hashedPassword,
+      role: "coordinator",
+      department: "Computer Engineering",
+      isEmailVerified: true,
+      isActive: true,
     });
 
     // --- Create Demo Student ---
@@ -74,6 +91,8 @@ export async function POST() {
       semester: 3,
       batch: "CE-A",
       assignedMentorId: mentor._id.toString(),
+      isEmailVerified: true,
+      isActive: true,
     });
 
     // --- Create Subjects ---
@@ -135,7 +154,6 @@ export async function POST() {
     await Assessment.insertMany(assessments);
 
     // --- Assignments ---
-    const assignmentData = [];
     const studentAssignmentData = [];
 
     for (const subject of subjects) {
@@ -147,8 +165,6 @@ export async function POST() {
           dueDate: subDays(now, (3 - i) * 14),
           maxMarks: 25,
         });
-        assignmentData.push(assignment);
-
         let status: "submitted_on_time" | "submitted_late" | "not_submitted";
         let marksObtained: number | null = null;
         let submittedAt: Date | null = null;
@@ -279,6 +295,37 @@ export async function POST() {
     }
     await RiskScore.insertMany(riskHistoryEntries);
 
+    // --- Interventions ---
+    await Intervention.insertMany([
+      {
+        studentId: student._id,
+        facultyId: mentor._id,
+        type: "Academic Counseling",
+        date: subDays(now, 35),
+        scoreBefore: 76,
+        scoreAfter: 70,
+        notes: "Counseled student on attendance consistency and study scheduling.",
+      },
+      {
+        studentId: student._id,
+        facultyId: teacher._id,
+        type: "Extra Classes",
+        date: subDays(now, 21),
+        scoreBefore: 70,
+        scoreAfter: 66,
+        notes: "Weekly remedial class for Data Structures weak areas.",
+      },
+      {
+        studentId: student._id,
+        facultyId: mentor._id,
+        type: "Parent Meeting",
+        date: subDays(now, 10),
+        scoreBefore: 66,
+        scoreAfter: 62,
+        notes: "Aligned parent and mentor follow-up plan for assignment completion.",
+      },
+    ]);
+
     // --- Alerts ---
     await Alert.insertMany([
       {
@@ -334,6 +381,9 @@ export async function POST() {
         studentEmail: "sujal@college.edu",
         studentPassword: "password123",
         studentId: student._id,
+        coordinatorEmail: "coordinator@college.edu",
+        coordinatorPassword: "password123",
+        coordinatorId: coordinator._id,
       },
     });
   } catch (error) {

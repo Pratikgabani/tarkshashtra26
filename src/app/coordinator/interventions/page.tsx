@@ -1,7 +1,35 @@
 'use client';
 
-import { MOCK_INTERVENTIONS } from '@/src/lib/coordinatorData';
+import { useEffect, useState } from 'react';
 import { Activity, ArrowUpRight } from 'lucide-react';
+
+type InterventionRecord = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  facultyName: string;
+  type: string;
+  date: string;
+  scoreBefore: number;
+  scoreAfter: number;
+  improvement: number;
+};
+
+type InterventionData = {
+  interventions: InterventionRecord[];
+  totalInterventions: number;
+  improvedCount: number;
+  improvementRate: number;
+  avgRiskReduction: number;
+};
+
+const EMPTY_DATA: InterventionData = {
+  interventions: [],
+  totalInterventions: 0,
+  improvedCount: 0,
+  improvementRate: 0,
+  avgRiskReduction: 0,
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -15,11 +43,57 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function InterventionMonitoring() {
+  const [data, setData] = useState<InterventionData>(EMPTY_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadInterventions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/coordinator/intervention-analytics', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load intervention analytics');
+        }
+
+        const json = (await response.json()) as {
+          success: boolean;
+          data?: InterventionData;
+          message?: string;
+        };
+
+        if (!json.success || !json.data) {
+          throw new Error(json.message || 'Unable to load interventions');
+        }
+
+        setData(json.data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load interventions';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInterventions();
+  }, []);
+
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-hidden">
       <Topbar title="Intervention Tracking" subtitle="Monitor the effectiveness of actions taken by faculty and mentors" />
 
       <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-6xl mx-auto w-full">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold mb-6">
+            {error}
+          </div>
+        )}
         
         {/* Metric Header */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-6 shadow-sm mb-6 flex items-center gap-6 shrink-0">
@@ -27,8 +101,14 @@ export default function InterventionMonitoring() {
              <Activity className="w-6 h-6 text-[#2563EB]" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-[#111827]">{MOCK_INTERVENTIONS.length} Logged Interventions</h2>
-            <p className="text-[13px] font-medium text-[#6B7280] mt-1">Reviewing the "Score Before vs After" effectiveness metrics</p>
+            <h2 className="text-2xl font-black text-[#111827]">
+              {loading ? '...' : data.totalInterventions} Logged Interventions
+            </h2>
+            <p className="text-[13px] font-medium text-[#6B7280] mt-1">
+              {loading
+                ? 'Loading intervention effectiveness metrics...'
+                : `${data.improvementRate}% showed measurable risk reduction (avg ${data.avgRiskReduction} points).`}
+            </p>
           </div>
         </div>
 
@@ -46,8 +126,20 @@ export default function InterventionMonitoring() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
-                {MOCK_INTERVENTIONS.map((inv) => {
-                  const diff = inv.scoreAfter - inv.scoreBefore;
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-sm font-medium text-[#6B7280]">
+                      Loading interventions...
+                    </td>
+                  </tr>
+                ) : data.interventions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-sm font-medium text-[#6B7280]">
+                      No interventions recorded yet.
+                    </td>
+                  </tr>
+                ) : data.interventions.map((inv) => {
+                  const diff = inv.improvement;
                   const isPositive = diff > 0;
                   return (
                     <tr key={inv.id} className="hover:bg-[#F9FAFB]/50 transition-colors">

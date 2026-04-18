@@ -1,10 +1,53 @@
 'use client';
 
-import { getSystemAggregates, CLASSES } from '@/src/lib/coordinatorData';
+import { useEffect, useState } from 'react';
 import { Lightbulb, TrendingDown, Target, Building2, BookOpen } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+
+type Insight = {
+  type: string;
+  text: string;
+  action: string;
+};
+
+type DepartmentStat = {
+  department: string;
+  total: number;
+  atRisk: number;
+  riskRate: number;
+};
+
+type ClassStat = {
+  class: string;
+  avgScore: number;
+  atRiskCount: number;
+};
+
+type AnalyticsData = {
+  total: number;
+  atRisk: number;
+  riskPercentage: number;
+  deptStats: DepartmentStat[];
+  classStats: ClassStat[];
+  insights: Insight[];
+};
+
+const EMPTY_ANALYTICS_DATA: AnalyticsData = {
+  total: 0,
+  atRisk: 0,
+  riskPercentage: 0,
+  deptStats: [],
+  classStats: [],
+  insights: [],
+};
+
+const INSIGHT_ICONS: Record<string, typeof Building2> = {
+  Department: Building2,
+  Class: BookOpen,
+  Intervention: TrendingDown,
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -18,55 +61,68 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function CoordinatorAnalytics() {
-  const { total, atRisk, deptStats } = getSystemAggregates();
-  const riskPercentage = Math.round((atRisk / total) * 100);
+  const [data, setData] = useState<AnalyticsData>(EMPTY_ANALYTICS_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Pattern detection insights (Simulated via simple rules on mock data)
-  // Our mock logic intentionally made Mechanical Eng High Risk.
-  const highestRiskDept = [...deptStats].sort((a,b) => b.riskRate - a.riskRate)[0];
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const insights = [
-    { 
-      type: 'Department', 
-      icon: Building2, 
-      text: `${highestRiskDept.department} has the highest risk concentration (${highestRiskDept.riskRate}% of students).`,
-      action: 'Discuss grading patterns with department faculty.'
-    },
-    { 
-      type: 'Subject', 
-      icon: BookOpen, 
-      text: `Mathematics 101 has consistently low performance across CE-A and CE-B classes.`,
-      action: 'Targeted extra classes recommended.'
-    },
-    { 
-      type: 'Trend', 
-      icon: TrendingDown, 
-      text: `Overall attendance across standard batches has dipped by 4% leading up to midterms.`,
-      action: 'Send automated attendance warning alerts.'
-    }
-  ];
+        const response = await fetch('/api/coordinator/department-stats', {
+          method: 'GET',
+          cache: 'no-store',
+        });
 
-  // Dummy Class stats
-  const classStats = CLASSES.map(c => {
-    return {
-      class: c,
-      avgScore: 50 + Math.floor(Math.random() * 30),
-      atRiskCount: Math.floor(Math.random() * 15)
-    }
-  });
+        if (!response.ok) {
+          throw new Error('Failed to load coordinator analytics');
+        }
+
+        const json = (await response.json()) as {
+          success: boolean;
+          data?: AnalyticsData;
+          message?: string;
+        };
+
+        if (!json.success || !json.data) {
+          throw new Error(json.message || 'Unable to load analytics data');
+        }
+
+        setData(json.data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load analytics';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, []);
+
+  const { riskPercentage, deptStats, classStats, insights } = data;
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB]">
       <Topbar title="Aggregate Analytics & Patterns" subtitle="Automated insights and deep drill-downs into risk vectors" />
 
       <main className="flex-1 p-8 space-y-8 overflow-y-auto max-w-7xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold">
+            {error}
+          </div>
+        )}
         
         {/* Core Percentage Card */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-8 flex items-center justify-between shadow-sm">
           <div>
             <h2 className="text-sm font-bold text-[#6B7280] uppercase tracking-wider mb-2">Institution Health Score</h2>
             <div className="flex items-end gap-3">
-              <span className={`text-5xl font-black ${riskPercentage > 20 ? 'text-[#EF4444]' : 'text-[#10B981]'}`}>{riskPercentage}%</span>
+              <span className={`text-5xl font-black ${riskPercentage > 20 ? 'text-[#EF4444]' : 'text-[#10B981]'}`}>
+                {loading ? '...' : `${riskPercentage}%`}
+              </span>
               <span className="text-[15px] font-bold text-[#111827] mb-1">of total student body is At-Risk</span>
             </div>
           </div>
@@ -89,7 +145,7 @@ export default function CoordinatorAnalytics() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {insights.map((ins, i) => {
-              const Icon = ins.icon;
+              const Icon = INSIGHT_ICONS[ins.type] || Lightbulb;
               return (
                 <div key={i} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-5 hover:border-blue-300 transition-colors">
                   <div className="flex items-center gap-2 mb-3">
@@ -128,7 +184,7 @@ export default function CoordinatorAnalytics() {
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Department Risk Rates</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">Percentage of at-risk students by department</p>
             <div className="space-y-4">
-              {deptStats.sort((a,b) => b.riskRate - a.riskRate).map(d => (
+              {[...deptStats].sort((a,b) => b.riskRate - a.riskRate).map(d => (
                 <div key={d.department}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-[13px] font-bold text-[#111827]">{d.department}</span>

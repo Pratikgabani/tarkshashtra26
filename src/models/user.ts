@@ -12,6 +12,7 @@ export interface IUser extends Document {
   semester?: number;        // Only for students
   batch?: string;           // Only for students
   assignedMentorId?: string; // Only for students — links to a mentor user
+  isActive?: boolean;
   isEmailVerified: boolean;
   signupOtpHash?: string;
   signupOtpExpiresAt?: Date;
@@ -74,6 +75,10 @@ const UserSchema: Schema<IUser> = new Schema(
     assignedMentorId: {
       type: String,
       trim: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     isEmailVerified: {
       type: Boolean,

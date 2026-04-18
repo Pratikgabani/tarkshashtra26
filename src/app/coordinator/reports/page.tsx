@@ -1,7 +1,40 @@
 'use client';
 
-import { MOCK_STUDENTS, getSystemAggregates } from '@/src/lib/coordinatorData';
+import { useEffect, useState } from 'react';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
+
+type RiskDistribution = {
+  Low: number;
+  Medium: number;
+  High: number;
+  Critical: number;
+};
+
+type DashboardData = {
+  total: number;
+  atRisk: number;
+  riskDist: RiskDistribution;
+};
+
+type StudentRecord = {
+  id: string;
+  name: string;
+  department: string;
+  classBatch: string;
+  riskScore: number;
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
+};
+
+const EMPTY_DASHBOARD_DATA: DashboardData = {
+  total: 0,
+  atRisk: 0,
+  riskDist: {
+    Low: 0,
+    Medium: 0,
+    High: 0,
+    Critical: 0,
+  },
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -15,23 +48,101 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function ReportsPage() {
-  const { total, atRisk, riskDist } = getSystemAggregates();
+  const [dashboardData, setDashboardData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
+  const [topAtRisk, setTopAtRisk] = useState<StudentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDownloadingCsv, setIsDownloadingCsv] = useState(false);
 
-  const handleDownloadCSV = () => {
-    const headers = ['ID,Name,Department,Class,Attendance%,AvgMarks,RiskScore,RiskLevel'];
-    const rows = MOCK_STUDENTS.map(s => 
-      `${s.id},${s.name},${s.department},${s.classBatch},${s.attendance},${s.avgMarks},${s.riskScore},${s.riskLevel}`
-    );
-    const csvContent = headers.concat(rows).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'student_risk_report.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  useEffect(() => {
+    const loadReportData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [dashboardRes, atRiskRes] = await Promise.all([
+          fetch('/api/coordinator/dashboard', {
+            method: 'GET',
+            cache: 'no-store',
+          }),
+          fetch('/api/coordinator/at-risk?riskLevel=High,Critical&limit=5', {
+            method: 'GET',
+            cache: 'no-store',
+          }),
+        ]);
+
+        if (!dashboardRes.ok || !atRiskRes.ok) {
+          throw new Error('Failed to load report data');
+        }
+
+        const dashboardJson = (await dashboardRes.json()) as {
+          success: boolean;
+          data?: DashboardData;
+          message?: string;
+        };
+
+        const atRiskJson = (await atRiskRes.json()) as {
+          success: boolean;
+          data?: {
+            students: StudentRecord[];
+          };
+          message?: string;
+        };
+
+        if (!dashboardJson.success || !dashboardJson.data) {
+          throw new Error(dashboardJson.message || 'Unable to load dashboard summary');
+        }
+
+        if (!atRiskJson.success || !atRiskJson.data) {
+          throw new Error(atRiskJson.message || 'Unable to load at-risk roster');
+        }
+
+        setDashboardData(dashboardJson.data);
+        setTopAtRisk(atRiskJson.data.students);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load reports';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReportData();
+  }, []);
+
+  const { total, atRisk, riskDist } = dashboardData;
+
+  const handleDownloadCSV = async () => {
+    try {
+      setIsDownloadingCsv(true);
+
+      const response = await fetch('/api/coordinator/export?format=csv', {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        throw new Error('CSV export failed');
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition');
+      const fallbackFileName = `coordinator-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      const fileNameMatch = disposition?.match(/filename="?([^\"]+)"?/i);
+      const fileName = fileNameMatch?.[1] || fallbackFileName;
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setError('Failed to export CSV report');
+    } finally {
+      setIsDownloadingCsv(false);
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -45,6 +156,11 @@ export default function ReportsPage() {
       <Topbar title="Generate Reports" subtitle="Export analytical breakdown datasets for local offline review" />
 
       <main className="flex-1 p-8 max-w-5xl w-full mx-auto space-y-8 print:p-0">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold print:hidden">
+            {error}
+          </div>
+        )}
         
         {/* Actions Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:hidden">
@@ -56,9 +172,10 @@ export default function ReportsPage() {
             <p className="text-[13px] text-[#6B7280] font-medium mb-6">Download the complete dataset of students and calculated risk factors for Excel or Sheets.</p>
             <button 
               onClick={handleDownloadCSV}
+              disabled={isDownloadingCsv}
               className="flex items-center gap-2 bg-[#111827] hover:bg-[#374151] text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-colors"
             >
-              <Download className="w-4 h-4" /> Download CSV
+              <Download className="w-4 h-4" /> {isDownloadingCsv ? 'Downloading...' : 'Download CSV'}
             </button>
           </div>
 
@@ -85,9 +202,9 @@ export default function ReportsPage() {
            </div>
 
            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{total}</p></div>
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{atRisk}</p></div>
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Critical Tier</p><p className="text-2xl font-black text-[#111827]">{riskDist.Critical}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{loading ? '...' : total}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{loading ? '...' : atRisk}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Critical Tier</p><p className="text-2xl font-black text-[#111827]">{loading ? '...' : riskDist.Critical}</p></div>
            </div>
 
            <h3 className="text-sm font-bold text-[#111827] mb-4 uppercase tracking-widest border-b border-[#E5E7EB] pb-2">High & Critical Risk Roster (Top 5)</h3>
@@ -100,7 +217,13 @@ export default function ReportsPage() {
                </tr>
              </thead>
              <tbody className="divide-y divide-[#E5E7EB]">
-               {MOCK_STUDENTS.filter(s => s.riskLevel === 'Critical' || s.riskLevel === 'High').slice(0, 5).map(s => (
+               {topAtRisk.length === 0 ? (
+                 <tr>
+                   <td colSpan={3} className="py-8 text-center text-[12px] font-semibold text-[#6B7280]">
+                     No high-risk students found.
+                   </td>
+                 </tr>
+               ) : topAtRisk.map(s => (
                  <tr key={s.id}>
                    <td className="py-4">
                      <p className="text-[13px] font-bold text-[#111827]">{s.name}</p>

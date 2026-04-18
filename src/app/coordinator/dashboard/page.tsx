@@ -1,12 +1,53 @@
 'use client';
 
-import { getSystemAggregates, MOCK_STUDENTS } from '@/src/lib/coordinatorData';
+import { useEffect, useMemo, useState } from 'react';
 import { Users, AlertTriangle, Activity, Briefcase } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line
 } from 'recharts';
+
+type RiskDistribution = {
+  Low: number;
+  Medium: number;
+  High: number;
+  Critical: number;
+};
+
+type DepartmentStat = {
+  department: string;
+  total: number;
+  atRisk: number;
+  riskRate: number;
+};
+
+type TrendPoint = {
+  month: string;
+  atRisk: number;
+  total: number;
+};
+
+type DashboardData = {
+  total: number;
+  atRisk: number;
+  riskDist: RiskDistribution;
+  deptStats: DepartmentStat[];
+  trendData: TrendPoint[];
+};
+
+const EMPTY_DASHBOARD_DATA: DashboardData = {
+  total: 0,
+  atRisk: 0,
+  riskDist: {
+    Low: 0,
+    Medium: 0,
+    High: 0,
+    Critical: 0,
+  },
+  deptStats: [],
+  trendData: [],
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -20,7 +61,53 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function CoordinatorDashboard() {
-  const { total, atRisk, riskDist, deptStats } = getSystemAggregates();
+  const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/coordinator/dashboard', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch coordinator dashboard');
+        }
+
+        const json = (await response.json()) as {
+          success: boolean;
+          data?: DashboardData;
+          message?: string;
+        };
+
+        if (!json.success || !json.data) {
+          throw new Error(json.message || 'Unable to load dashboard data');
+        }
+
+        setData(json.data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
+
+  const { total, atRisk, riskDist, deptStats, trendData } = data;
+
+  const riskPercentage = useMemo(() => {
+    if (total === 0) return 0;
+    return Math.round((atRisk / total) * 100);
+  }, [atRisk, total]);
 
   const pieData = [
     { name: 'Low Risk', value: riskDist.Low, color: '#10B981' },
@@ -29,19 +116,16 @@ export default function CoordinatorDashboard() {
     { name: 'Critical Risk', value: riskDist.Critical, color: '#EF4444' },
   ];
 
-  // Dummy line chart data for trends
-  const trendData = [
-    { month: 'Jan', atRisk: 42, total: 150 },
-    { month: 'Feb', atRisk: 38, total: 150 },
-    { month: 'Mar', atRisk: 45, total: 150 },
-    { month: 'Apr', atRisk: atRisk, total: 150 },
-  ];
-
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB]">
       <Topbar title="Institution Overview" subtitle="High-level pulse on academic performance blocks" />
 
       <main className="flex-1 p-8 space-y-8 overflow-y-auto max-w-7xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold">
+            {error}
+          </div>
+        )}
         
         {/* Metric Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -49,7 +133,7 @@ export default function CoordinatorDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">Total Students</p>
-                <p className="text-3xl font-black text-[#111827]">{total}</p>
+                <p className="text-3xl font-black text-[#111827]">{loading ? '...' : total}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
                 <Users className="w-5 h-5 text-[#2563EB]" />
@@ -61,8 +145,8 @@ export default function CoordinatorDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">At-Risk Students</p>
-                <p className="text-3xl font-black text-[#EF4444]">{atRisk}</p>
-                <p className="text-[11px] font-semibold text-[#6B7280] mt-1">{Math.round((atRisk/total)*100)}% of student body</p>
+                <p className="text-3xl font-black text-[#EF4444]">{loading ? '...' : atRisk}</p>
+                <p className="text-[11px] font-semibold text-[#6B7280] mt-1">{riskPercentage}% of student body</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-[#EF4444]" />
@@ -74,7 +158,7 @@ export default function CoordinatorDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">Critical Cases</p>
-                <p className="text-3xl font-black text-[#111827]">{riskDist.Critical}</p>
+                <p className="text-3xl font-black text-[#111827]">{loading ? '...' : riskDist.Critical}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                 <Activity className="w-5 h-5 text-[#6B7280]" />
@@ -86,7 +170,7 @@ export default function CoordinatorDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">Departments</p>
-                <p className="text-3xl font-black text-[#111827]">{deptStats.length}</p>
+                <p className="text-3xl font-black text-[#111827]">{loading ? '...' : deptStats.length}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-[#6B7280]" />
@@ -153,9 +237,12 @@ export default function CoordinatorDashboard() {
               <h3 className="text-[15px] font-bold text-[#111827]">At-Risk Trend (Institution Wide)</h3>
               <p className="text-xs text-[#6B7280] font-medium mt-1">Number of students flagged vs total body</p>
             </div>
-            <button className="px-4 py-2 border border-[#E5E7EB] rounded-lg text-xs font-bold text-[#111827] bg-white hover:bg-[#F9FAFB]">
-              Export Chart
-            </button>
+            <a
+              href="/api/coordinator/export?format=csv"
+              className="px-4 py-2 border border-[#E5E7EB] rounded-lg text-xs font-bold text-[#111827] bg-white hover:bg-[#F9FAFB]"
+            >
+              Export CSV
+            </a>
           </div>
           <div className="h-[300px]">
              <ResponsiveContainer width="100%" height="100%">

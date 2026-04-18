@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { MOCK_USERS, UserRecord, UserRole } from '@/src/lib/coordinatorData';
+import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Plus, Users as UsersIcon, X } from 'lucide-react';
+
+type UserRole = 'Student' | 'Teacher' | 'Mentor';
+
+type UserRecord = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  status: 'Active' | 'Inactive';
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -16,7 +26,10 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<UserRecord[]>(MOCK_USERS);
+  const [users, setUsers] = useState<UserRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [filterRole, setFilterRole] = useState<string>('All');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,14 +39,96 @@ export default function UserManagement() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('Student');
-  const [department, setDepartment] = useState<any>('Computer Eng.');
+  const [department, setDepartment] = useState('Computer Eng.');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/coordinator/users', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load users');
+        }
+
+        const json = (await response.json()) as {
+          success: boolean;
+          data?: {
+            users: UserRecord[];
+          };
+          message?: string;
+        };
+
+        if (!json.success || !json.data) {
+          throw new Error(json.message || 'Unable to load users');
+        }
+
+        setUsers(json.data.users);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load users';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  const refreshUsers = async () => {
+    const response = await fetch('/api/coordinator/users', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to refresh users');
+    }
+
+    const json = (await response.json()) as {
+      success: boolean;
+      data?: {
+        users: UserRecord[];
+      };
+      message?: string;
+    };
+
+    if (!json.success || !json.data) {
+      throw new Error(json.message || 'Unable to refresh users');
+    }
+
+    setUsers(json.data.users);
+  };
 
   const filteredUsers = filterRole === 'All' ? users : users.filter(u => u.role === filterRole);
 
-  const handleDelete = (id: string) => {
-    if(confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(u => u.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+
+    try {
+      setError(null);
+
+      const response = await fetch(`/api/coordinator/users/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const json = (await response.json()) as { message?: string };
+        throw new Error(json.message || 'Failed to delete user');
+      }
+
+      await refreshUsers();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete user';
+      setError(message);
     }
   };
 
@@ -57,18 +152,45 @@ export default function UserManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, name, email, role, department, status } : u));
-    } else {
-      const newUser: UserRecord = {
-        id: `U00${users.length + 1}`,
-        name, email, role, department, status
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const payload = {
+        name,
+        email,
+        role,
+        department,
+        status,
       };
-      setUsers([...users, newUser]);
+
+      const response = await fetch(
+        editingUser ? `/api/coordinator/users/${editingUser.id}` : '/api/coordinator/users',
+        {
+          method: editingUser ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const json = (await response.json()) as { message?: string };
+        throw new Error(json.message || 'Failed to save user');
+      }
+
+      await refreshUsers();
+      setIsModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save user';
+      setError(message);
+    } finally {
+      setSubmitting(false);
     }
-    setIsModalOpen(false);
   };
 
   return (
@@ -76,6 +198,11 @@ export default function UserManagement() {
       <Topbar title="User Management" subtitle="Create, edit, and assign roles for students, teachers, and mentors" />
 
       <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-[1400px]">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold mb-6">
+            {error}
+          </div>
+        )}
         
         {/* Actions Bar */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-center justify-between shrink-0">
@@ -121,7 +248,11 @@ export default function UserManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
-                 {filteredUsers.map(user => (
+                 {loading ? (
+                   <tr>
+                     <td colSpan={5} className="py-12 text-center text-[13px] font-semibold text-[#6B7280]">Loading users...</td>
+                   </tr>
+                 ) : filteredUsers.map(user => (
                    <tr key={user.id} className="hover:bg-[#F9FAFB]/50 transition-colors">
                      <td className="px-6 py-4">
                        <div className="text-[14px] font-bold text-[#111827]">{user.name}</div>
@@ -153,7 +284,7 @@ export default function UserManagement() {
                      </td>
                    </tr>
                  ))}
-                 {filteredUsers.length === 0 && (
+                 {!loading && filteredUsers.length === 0 && (
                    <tr>
                      <td colSpan={5} className="py-12 text-center text-[13px] font-semibold text-[#6B7280]">No users found for this role.</td>
                    </tr>
@@ -212,7 +343,9 @@ export default function UserManagement() {
                 </div>
                 <div className="pt-4 flex justify-end gap-3 border-t border-[#E5E7EB] mt-6">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 font-bold text-sm text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FAFB] rounded-lg transition-colors">Cancel</button>
-                  <button type="submit" className="px-5 py-2 font-bold text-sm text-white bg-[#2563EB] hover:bg-blue-700 rounded-lg shadow-sm transition-colors">{editingUser ? 'Save Changes' : 'Create User'}</button>
+                  <button type="submit" disabled={submitting} className="px-5 py-2 font-bold text-sm text-white bg-[#2563EB] hover:bg-blue-700 rounded-lg shadow-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                    {submitting ? 'Saving...' : editingUser ? 'Save Changes' : 'Create User'}
+                  </button>
                 </div>
               </form>
             </div>
