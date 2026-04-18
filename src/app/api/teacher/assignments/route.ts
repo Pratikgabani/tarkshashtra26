@@ -160,27 +160,18 @@ export async function POST(request: NextRequest) {
       maxMarks: body.maxMarks,
     });
 
-    const subject = await Subject.findById(body.subjectId).lean();
-    if (subject) {
-      const students = await User.find({
-        role: "student",
-        department: subject.department,
-        semester: subject.semester,
-      })
-        .select("_id")
-        .lean();
+    const students = await User.find({ role: "student" }).select("_id").lean();
 
-      if (students.length > 0) {
-        await StudentAssignment.insertMany(
-          students.map((student) => ({
-            studentId: student._id,
-            assignmentId: assignment._id,
-            status: "not_submitted",
-            marksObtained: null,
-            submittedAt: null,
-          }))
-        );
-      }
+    if (students.length > 0) {
+      await StudentAssignment.insertMany(
+        students.map((student) => ({
+          studentId: student._id,
+          assignmentId: assignment._id,
+          status: "not_submitted",
+          marksObtained: null,
+          submittedAt: null,
+        }))
+      );
     }
 
     const refreshedData = await buildTeacherBaseData(teacherId);
@@ -287,18 +278,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const subjectIds = Array.from(
-      new Set(assignmentDocs.map((assignment) => assignment.subjectId.toString()))
-    );
-    const subjectDocs = subjectIds.length > 0
-      ? await Subject.find({ _id: { $in: subjectIds } }).select("_id department semester").lean()
-      : [];
-    const subjectMap = new Map(subjectDocs.map((subject) => [subject._id.toString(), subject]));
-
     const studentIds = Array.from(new Set(updates.map((update) => update.studentId)));
     const studentDocs = studentIds.length > 0
       ? await User.find({ _id: { $in: studentIds }, role: "student" })
-        .select("_id department semester")
+        .select("_id")
         .lean()
       : [];
     const studentMap = new Map(studentDocs.map((student) => [student._id.toString(), student]));
@@ -308,20 +291,10 @@ export async function PUT(request: NextRequest) {
       const assignment = assignmentMap.get(update.assignmentId);
       if (!assignment) continue;
 
-      const subject = subjectMap.get(assignment.subjectId.toString());
-      if (!subject) {
-        errors.push(`Update ${row}: subject not found for assignment ${update.assignmentId}`);
-        continue;
-      }
-
       const student = studentMap.get(update.studentId);
       if (!student) {
         errors.push(`Update ${row}: student not found`);
         continue;
-      }
-
-      if (student.department !== subject.department || student.semester !== subject.semester) {
-        errors.push(`Update ${row}: student does not belong to assignment subject cohort`);
       }
 
       if (update.marks !== null && (update.marks < 0 || update.marks > assignment.maxMarks)) {
@@ -420,21 +393,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const subject = await Subject.findById(assignment.subjectId).lean();
-    if (!subject) {
-      return NextResponse.json(
-        { success: false, message: "Subject not found for assignment" },
-        { status: 404 }
-      );
-    }
-
-    const students = await User.find({
-      role: "student",
-      department: subject.department,
-      semester: subject.semester,
-    })
-      .select("_id")
-      .lean();
+    const students = await User.find({ role: "student" }).select("_id").lean();
 
     const dbStatus = uiSubmissionStatusToDbStatus(body.status);
     const now = new Date();

@@ -115,25 +115,8 @@ const UI_TO_DB_SUBMISSION_STATUS: Record<UiSubmissionStatus, DbSubmissionStatus>
   "Not Submitted": "not_submitted",
 };
 
-function isStudentEligibleForSubject(student: TeacherStudent, subject: TeacherSubject): boolean {
-  return student.department === subject.department && student.semester === subject.semester;
-}
-
 function emptyAssessmentRecord(): Record<UiAssessmentId, number | null> {
   return { ut1: null, ut2: null, mid: null };
-}
-
-function buildStudentScopes(subjects: TeacherSubject[]): Array<{ department: string; semester: number }> {
-  const unique = new Map<string, { department: string; semester: number }>();
-
-  for (const subject of subjects) {
-    const key = `${subject.department}__${subject.semester}`;
-    if (!unique.has(key)) {
-      unique.set(key, { department: subject.department, semester: subject.semester });
-    }
-  }
-
-  return Array.from(unique.values());
 }
 
 export function toIsoDate(value: Date | string | null | undefined): string {
@@ -204,10 +187,7 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
     maxMarks: subject.maxMarks ?? 100,
   }));
 
-  const scopes = buildStudentScopes(subjects);
-  const studentDocs = scopes.length > 0
-    ? await User.find({ role: "student", $or: scopes }).sort({ fullName: 1 }).lean()
-    : [];
+  const studentDocs = await User.find({ role: "student" }).sort({ fullName: 1 }).lean();
 
   const students: TeacherStudent[] = studentDocs.map((student) => ({
     id: student._id.toString(),
@@ -255,7 +235,6 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
   for (const student of students) {
     marks[student.id] = {};
     for (const subject of subjects) {
-      if (!isStudentEligibleForSubject(student, subject)) continue;
       marks[student.id][subject.id] = emptyAssessmentRecord();
     }
   }
@@ -298,7 +277,6 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
     if (!subject) continue;
 
     for (const student of students) {
-      if (!isStudentEligibleForSubject(student, subject)) continue;
       submissions[assignment.id][student.id] = { status: "Not Submitted", marks: null };
     }
   }

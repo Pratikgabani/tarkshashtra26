@@ -15,6 +15,8 @@ interface TeacherStudent {
   name: string;
   studentId: string;
   batch: string;
+  semester: number;
+  department: string;
 }
 
 interface TeacherSubject {
@@ -270,7 +272,7 @@ export default function TeacherDashboard() {
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}
                   >
-                    {subject.id}
+                    {subject.name}
                   </button>
                 ))}
               </div>
@@ -281,6 +283,7 @@ export default function TeacherDashboard() {
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Student</th>
                     <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Batch</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Department</th>
                     {data.assessments.map((assessment) => (
                       <th key={assessment.id} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">
                         {assessment.label}
@@ -300,6 +303,7 @@ export default function TeacherDashboard() {
                         <p className="text-xs text-gray-400">{row.student.studentId}</p>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-500">{row.student.batch}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500">{row.student.department}</td>
                       <td className="px-3 py-2.5 text-xs font-medium text-gray-700">{row.marks.ut1 ?? '—'}</td>
                       <td className="px-3 py-2.5 text-xs font-medium text-gray-700">{row.marks.ut2 ?? '—'}</td>
                       <td className="px-3 py-2.5 text-xs font-medium text-gray-700">{row.marks.mid ?? '—'}</td>
@@ -391,10 +395,14 @@ export default function TeacherDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Link href="/teacher/marks" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-200 hover:shadow-sm transition-all">
             <p className="text-sm font-semibold text-gray-900">Enter Marks</p>
             <p className="text-xs text-gray-500 mt-0.5">Single entry and CSV bulk upload</p>
+          </Link>
+          <Link href="/teacher/attendance" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-200 hover:shadow-sm transition-all">
+            <p className="text-sm font-semibold text-gray-900">Record Attendance</p>
+            <p className="text-xs text-gray-500 mt-0.5">Mark present, absent, or late for each student</p>
           </Link>
           <Link href="/teacher/assignments" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-200 hover:shadow-sm transition-all">
             <p className="text-sm font-semibold text-gray-900">Manage Assignments</p>

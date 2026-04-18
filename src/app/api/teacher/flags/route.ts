@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Alert from "@/src/models/alert";
-import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
 import { buildTeacherBaseData, toIsoDate } from "@/src/lib/teacherBackend";
 
@@ -10,19 +9,6 @@ interface TeacherFlagInput {
   teacherId: string;
   studentId: string;
   note: string;
-}
-
-async function teacherHasStudentAccess(teacherId: string, studentId: string): Promise<boolean> {
-  const [teacherSubjects, student] = await Promise.all([
-    Subject.find({ teacherId }).select("department semester").lean(),
-    User.findById(studentId).lean(),
-  ]);
-
-  if (!student || student.role !== "student") return false;
-
-  return teacherSubjects.some(
-    (subject) => subject.department === student.department && subject.semester === student.semester
-  );
 }
 
 /**
@@ -95,14 +81,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, message: "note must be between 5 and 500 characters" },
         { status: 400 }
-      );
-    }
-
-    const hasAccess = await teacherHasStudentAccess(teacherId, body.studentId);
-    if (!hasAccess) {
-      return NextResponse.json(
-        { success: false, message: "Teacher does not have access to this student" },
-        { status: 403 }
       );
     }
 

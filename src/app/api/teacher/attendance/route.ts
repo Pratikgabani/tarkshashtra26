@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Attendance from "@/src/models/attendance";
-import { buildTeacherBaseData, type TeacherSubject } from "@/src/lib/teacherBackend";
+import { buildTeacherBaseData } from "@/src/lib/teacherBackend";
 
 type AttendanceStatus = "present" | "absent" | "late";
 
@@ -42,10 +42,6 @@ function isAttendanceStatus(value: unknown): value is AttendanceStatus {
   return value === "present" || value === "absent" || value === "late";
 }
 
-function studentBelongsToSubject(student: { department: string; semester: number }, subject: TeacherSubject): boolean {
-  return student.department === subject.department && student.semester === subject.semester;
-}
-
 async function buildTeacherAttendancePayload(
   teacherId: string,
   subjectIdParam?: string | null,
@@ -78,7 +74,7 @@ async function buildTeacherAttendancePayload(
   const attendanceDate = parseIsoDateOnly(dateParam);
   const nextDay = nextUtcDay(attendanceDate);
 
-  const cohort = baseData.students.filter((student) => studentBelongsToSubject(student, activeSubject));
+  const cohort = baseData.students;
   const cohortIds = cohort.map((student) => student.id);
 
   const attendanceDocs = cohortIds.length > 0
@@ -213,11 +209,7 @@ export async function PUT(request: NextRequest) {
     const attendanceDate = parseIsoDateOnly(body.date);
     const nextDay = nextUtcDay(attendanceDate);
 
-    const eligibleStudentIds = new Set(
-      baseData.students
-        .filter((student) => studentBelongsToSubject(student, subject))
-        .map((student) => student.id)
-    );
+    const eligibleStudentIds = new Set(baseData.students.map((student) => student.id));
 
     const errors: string[] = [];
 
@@ -232,7 +224,7 @@ export async function PUT(request: NextRequest) {
       }
 
       if (!eligibleStudentIds.has(studentId)) {
-        errors.push(`Row ${row}: student is not part of this subject cohort`);
+        errors.push(`Row ${row}: student not found`);
         continue;
       }
 

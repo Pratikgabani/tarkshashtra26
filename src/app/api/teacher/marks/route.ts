@@ -33,14 +33,9 @@ async function validateTeacherSubjectAccess(teacherId: string, subjectId: string
   return Boolean(subject);
 }
 
-async function validateStudentForSubject(studentId: string, subjectId: string): Promise<boolean> {
-  const [student, subject] = await Promise.all([
-    User.findById(studentId).lean(),
-    Subject.findById(subjectId).lean(),
-  ]);
-
-  if (!student || student.role !== "student" || !subject) return false;
-  return student.department === subject.department && student.semester === subject.semester;
+async function validateStudentExists(studentId: string): Promise<boolean> {
+  const student = await User.findById(studentId).select("role").lean();
+  return Boolean(student && student.role === "student");
 }
 
 function normalizeMarks(value: unknown): number | null {
@@ -175,9 +170,9 @@ export async function PUT(request: NextRequest) {
         continue;
       }
 
-      const isEligible = await validateStudentForSubject(update.studentId, update.subjectId);
-      if (!isEligible) {
-        errors.push(`Student ${update.studentId} is not eligible for subject ${update.subjectId}`);
+      const studentExists = await validateStudentExists(update.studentId);
+      if (!studentExists) {
+        errors.push(`Student ${update.studentId} not found`);
         continue;
       }
 
@@ -285,9 +280,9 @@ export async function PATCH(request: NextRequest) {
         continue;
       }
 
-      const eligible = await validateStudentForSubject(row.studentId, update.subjectId);
-      if (!eligible) {
-        errors.push(`Student ${row.studentId} is not eligible for subject ${update.subjectId}`);
+      const studentExists = await validateStudentExists(row.studentId);
+      if (!studentExists) {
+        errors.push(`Student ${row.studentId} not found`);
         continue;
       }
 
