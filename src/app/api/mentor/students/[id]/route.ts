@@ -139,8 +139,8 @@ export async function GET(
       .sort({ createdAt: -1 })
       .lean();
 
-    const interventionComparison: InterventionComparison[] = actions
-      .map((action) => {
+    const interventionComparison = actions
+      .map((action): InterventionComparison | null => {
         const actionDate = new Date(action.date);
         const before = [...riskHistory]
           .reverse()
@@ -150,7 +150,8 @@ export async function GET(
         if (!before || !after) return null;
 
         const delta = Math.round((after.score - before.score) * 100) / 100;
-        const trend = delta < 0 ? "improved" : delta > 0 ? "worsened" : "unchanged";
+        const trend: InterventionComparison["trend"] =
+          delta < 0 ? "improved" : delta > 0 ? "worsened" : "unchanged";
 
         return {
           actionId: action._id.toString(),

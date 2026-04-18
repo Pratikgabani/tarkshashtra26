@@ -42,6 +42,7 @@ export interface StudentAssessment {
 }
 
 export interface StudentAssignmentEntry {
+  assignmentId: string;
   title: string;
   status: "submitted_on_time" | "submitted_late" | "not_submitted";
   dueDate: string;
@@ -62,6 +63,8 @@ export interface StudentSubjectPerformance {
 }
 
 export interface StudentPendingAssignment {
+  assignmentId: string;
+  subjectId: string;
   title: string;
   subjectName: string;
   dueDate: string;
@@ -72,6 +75,7 @@ export interface StudentRiskHistoryPoint {
   score: number;
   riskLevel: "low" | "medium" | "high";
   date: string;
+  intervention?: boolean;
 }
 
 export interface StudentAlert {

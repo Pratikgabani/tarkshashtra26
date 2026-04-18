@@ -93,10 +93,15 @@ export default function AnalyticsPage() {
     void loadAnalytics();
   }, []);
 
+  const referenceTimestamp = useMemo(() => {
+    if (!data) return 0;
+    const referenceDate = data.generatedAt || data.riskScore.calculatedAt;
+    const parsed = new Date(referenceDate).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }, [data]);
+
   const chartData = useMemo(() => {
     if (!data) return [] as Array<{ date: string; score: number; intervention?: boolean; isoDate: string }>;
-
-    const now = Date.now();
     const horizonMs =
       timeRange === '4weeks'
         ? 28 * 24 * 60 * 60 * 1000
@@ -105,14 +110,17 @@ export default function AnalyticsPage() {
         : Number.POSITIVE_INFINITY;
 
     return data.riskHistory
-      .filter((point) => Number.isFinite(horizonMs) ? now - new Date(point.date).getTime() <= horizonMs : true)
+      .filter((point) => {
+        if (!Number.isFinite(horizonMs) || referenceTimestamp <= 0) return true;
+        return referenceTimestamp - new Date(point.date).getTime() <= horizonMs;
+      })
       .map((point) => ({
         isoDate: point.date,
         date: new Date(point.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
         score: point.score,
         intervention: point.intervention,
       }));
-  }, [data, timeRange]);
+  }, [data, timeRange, referenceTimestamp]);
 
   const { averageScore, bestImprovement, worstDrop } = useMemo(() => {
     if (chartData.length === 0) {

@@ -125,6 +125,41 @@ export default function StudentDashboard() {
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [submittingAssignmentId, setSubmittingAssignmentId] = useState('');
+
+  const riskHistory: RiskHistoryItem[] = useMemo(() => {
+    if (!data) return [];
+
+    return data.riskHistory.map((point, index) => ({
+      ...point,
+      week:
+        new Date(point.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ||
+        `Point ${index + 1}`,
+    }));
+  }, [data]);
+
+  const referenceDateMs = useMemo(() => {
+    if (!data) return null;
+    const referenceIso = data.generatedAt || data.riskScore.calculatedAt;
+    const parsed = new Date(referenceIso).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }, [data]);
+
+  const pendingAssignments = useMemo(() => {
+    if (!data) return [];
+
+    return data.pendingAssignments.map((assignment) => {
+      const dueMs = new Date(assignment.dueDate).getTime();
+      const baseMs = referenceDateMs ?? dueMs;
+      const rawDaysLeft = Number.isNaN(dueMs) ? 0 : Math.ceil((dueMs - baseMs) / 86400000);
+
+      return {
+        ...assignment,
+        daysLeft: Math.max(rawDaysLeft, 0),
+      };
+    });
+  }, [data, referenceDateMs]);
 
   useEffect(() => {
     async function loadData() {
@@ -140,6 +175,39 @@ export default function StudentDashboard() {
 
     void loadData();
   }, []);
+
+  async function handleSubmitAssignment(assignmentId: string) {
+    if (!assignmentId) return;
+
+    setSubmittingAssignmentId(assignmentId);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/student/assignments/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignmentId }),
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json?.success) {
+        setError(json?.message || 'Failed to submit assignment.');
+        return;
+      }
+
+      const refreshed = await fetchStudentDashboardData();
+      if (refreshed.ok) {
+        setData(refreshed.data);
+      }
+
+      setNotice(json?.message || 'Assignment submitted successfully.');
+    } catch {
+      setError('Failed to submit assignment.');
+    } finally {
+      setSubmittingAssignmentId('');
+    }
+  }
 
   if (loading) {
     return (
@@ -159,17 +227,6 @@ export default function StudentDashboard() {
       </div>
     );
   }
-
-  const riskHistory: RiskHistoryItem[] = useMemo(
-    () =>
-      data.riskHistory.map((point, index) => ({
-        ...point,
-        week:
-          new Date(point.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ||
-          `Point ${index + 1}`,
-      })),
-    [data.riskHistory]
-  );
 
   const trendWorsening =
     riskHistory.length > 1
@@ -192,6 +249,12 @@ export default function StudentDashboard() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-xs font-semibold">
             {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-xs font-semibold">
+            {notice}
           </div>
         )}
         
@@ -395,20 +458,32 @@ export default function StudentDashboard() {
             </h3>
             
             <div className="space-y-3">
-              {data.pendingAssignments.map(pa => {
-                const daysLeft = Math.ceil((new Date(pa.dueDate).getTime() - Date.now()) / 86400000);
+              {pendingAssignments.length === 0 && (
+                <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-xs font-semibold text-green-700">
+                  No pending assignments right now. Keep it up.
+                </div>
+              )}
+
+              {pendingAssignments.map(pa => {
                 return (
-                  <div key={`${pa.title}-${pa.dueDate}`} className="bg-orange-50/50 border border-orange-100 rounded-lg p-4 flex gap-4 items-center">
+                  <div key={pa.assignmentId || `${pa.title}-${pa.dueDate}`} className="bg-orange-50/50 border border-orange-100 rounded-lg p-4 flex gap-4 items-center">
                     <div className="w-12 h-12 rounded-xl bg-white border border-orange-200 flex flex-col items-center justify-center shrink-0 shadow-sm">
                       <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Due in</span>
-                      <span className="text-lg font-black text-orange-600 leading-none">{Math.max(daysLeft, 0)}d</span>
+                      <span className="text-lg font-black text-orange-600 leading-none">{pa.daysLeft}d</span>
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-bold text-gray-900 leading-tight">{pa.title}</h4>
-                      <p className="text-xs font-semibold text-gray-500 mt-1">{(pa as { subject?: string }).subject ?? 'Subject'} • Max {pa.maxMarks} marks</p>
+                      <p className="text-xs font-semibold text-gray-500 mt-1">{pa.subjectName} • Max {pa.maxMarks} marks</p>
                     </div>
-                    <button className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
-                      Submit
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleSubmitAssignment(pa.assignmentId);
+                      }}
+                      disabled={!pa.assignmentId || submittingAssignmentId === pa.assignmentId}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-60"
+                    >
+                      {submittingAssignmentId === pa.assignmentId ? 'Submitting...' : 'Submit'}
                     </button>
                   </div>
                 );

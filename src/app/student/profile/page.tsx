@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchStudentDashboardData, type StudentDashboardData } from '@/src/lib/studentDashboardClient';
-import { User, Mail, BookOpen, GraduationCap, Users } from 'lucide-react';
+import { Mail, BookOpen, GraduationCap, Users } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -35,16 +35,6 @@ export default function ProfilePage() {
     void loadProfile();
   }, []);
 
-  const initials = useMemo(() => {
-    if (!data?.student.fullName) return 'ST';
-    return data.student.fullName
-      .split(' ')
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }, [data?.student.fullName]);
-
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -63,6 +53,15 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  const initials = data.student.fullName
+    ? data.student.fullName
+        .split(' ')
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'ST';
 
   const mentorInitials = data.student.mentor?.fullName
     ? data.student.mentor.fullName

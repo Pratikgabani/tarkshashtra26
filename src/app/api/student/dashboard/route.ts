@@ -276,14 +276,24 @@ export async function GET(request: NextRequest) {
     );
 
     const assignmentsBySubject: Record<string, Array<{
-      title: string; status: string; dueDate: string; marksObtained: number | null; maxMarks: number;
+      assignmentId: string;
+      title: string;
+      status: string;
+      dueDate: string;
+      marksObtained: number | null;
+      maxMarks: number;
     }>> = {};
 
     let totalAssignments = 0;
     let submittedAssignments = 0;
     let lateSubmissions = 0;
     const pendingAssignments: Array<{
-      title: string; subjectName: string; dueDate: string; maxMarks: number;
+      assignmentId: string;
+      subjectId: string;
+      title: string;
+      subjectName: string;
+      dueDate: string;
+      maxMarks: number;
     }> = [];
 
     for (const assignment of assignments) {
@@ -298,6 +308,7 @@ export async function GET(request: NextRequest) {
       if (!assignmentsBySubject[sid]) assignmentsBySubject[sid] = [];
 
       assignmentsBySubject[sid].push({
+        assignmentId,
         title: assignment.title,
         status,
         dueDate: assignment.dueDate.toISOString(),
@@ -312,6 +323,8 @@ export async function GET(request: NextRequest) {
       if (status === "submitted_late") lateSubmissions++;
       if (status === "not_submitted") {
         pendingAssignments.push({
+          assignmentId,
+          subjectId: sid,
           title: assignment.title,
           subjectName,
           dueDate: assignment.dueDate.toISOString(),

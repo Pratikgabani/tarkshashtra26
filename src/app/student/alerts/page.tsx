@@ -25,27 +25,42 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function loadAlerts() {
-    try {
-      const response = await fetch('/api/student/alerts', { cache: 'no-store' });
-      const json = await response.json();
-
-      if (response.ok && json?.success && json?.data) {
-        setAlerts(Array.isArray(json.data.alerts) ? json.data.alerts : []);
-        setError('');
-        return;
-      }
-
-      setError(json?.message || 'Unable to load alerts.');
-    } catch {
-      setError('Unable to load alerts.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    void loadAlerts();
+    let cancelled = false;
+
+    async function loadAlerts() {
+      try {
+        const response = await fetch('/api/student/alerts', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (cancelled) return;
+
+        if (response.ok && json?.success && json?.data) {
+          setAlerts(Array.isArray(json.data.alerts) ? json.data.alerts : []);
+          setError('');
+          return;
+        }
+
+        setError(json?.message || 'Unable to load alerts.');
+      } catch {
+        if (!cancelled) {
+          setError('Unable to load alerts.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadAlerts();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   const filteredAlerts = useMemo(

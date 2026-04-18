@@ -243,8 +243,9 @@ export async function GET(
     }
 
     const pdfBuffer = buildSimplePdf(pdfLines.slice(0, 45));
+    const pdfBody = new Uint8Array(pdfBuffer);
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBody, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
