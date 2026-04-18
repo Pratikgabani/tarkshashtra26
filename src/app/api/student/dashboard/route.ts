@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
     let riskData: {
       studentId: string;
       score: number;
-      riskLevel: "low" | "medium" | "high" | "critical";
+      riskLevel: "low" | "medium" | "high";
       factors: unknown[];
       calculatedAt: string;
     } | null = null;

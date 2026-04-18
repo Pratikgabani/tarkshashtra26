@@ -11,8 +11,7 @@ function formatDate(d: string) { return new Date(d).toLocaleDateString('en-IN', 
 function getUser() { const s = localStorage.getItem('shikshasetu_user'); return s ? JSON.parse(s) : null; }
 
 function priorityStyle(p: string) {
-  if (p === 'critical') return 'border-l-red-500 bg-red-50/30';
-  if (p === 'high') return 'border-l-orange-500 bg-orange-50/30';
+  if (p === 'high') return 'border-l-red-500 bg-red-50/30';
   if (p === 'medium') return 'border-l-yellow-500';
   return 'border-l-blue-500';
 }
@@ -117,8 +116,7 @@ export default function AlertsPage() {
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-[10px] text-[#6B7280]">{formatDate(a.sentAt)}</span>
                       <span className={`px-2 py-0.5 rounded border text-[10px] font-semibold ${
-                        a.priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
-                        a.priority === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        a.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200' :
                         a.priority === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                         'bg-blue-50 text-blue-700 border-blue-200'
                       }`}>{a.priority}</span>

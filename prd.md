@@ -73,7 +73,7 @@ This Platform solves that problem. It aggregates all academic signals for every 
 - It does **not just show a score** — it explains **WHY** a student is at risk (explainability).
 - It is **actionable** — faculty can log interventions directly in the system.
 - It **measures results** — before vs. after comparison shows whether interventions worked.
-- It **sends automatic alerts** — mentors are notified before the situation gets critical.
+- It **sends automatic alerts** — mentors are notified before the situation becomes severe.
 - It **serves all stakeholders** — students, mentors, teachers, and coordinators each get their own view.
 
 ---
@@ -150,7 +150,7 @@ Undergraduate or postgraduate students enrolled in a course at the institution. 
 A faculty member assigned as a personal mentor to a group of students (typically 15–30 students). They are responsible for academic guidance and support.
 
 #### What They Can Do on the Platform
-- View a dashboard listing all mentees with their current risk scores and risk levels (Low, Medium, High, Critical).
+- View a dashboard listing all mentees with their current risk scores and risk levels (Low, Medium, High).
 - Filter students by class, subject, risk level, or semester.
 - Click on any student to see a detailed academic profile with all contributing risk factors explained.
 - Log intervention actions against a specific student (e.g., *"Conducted counselling session on 15 Apr 2026 — discussed attendance issues"*).
@@ -212,14 +212,13 @@ The heart of this Platform is the **Academic Risk Score**. This section explains
 
 ### 5.1 Overview of the Risk Score
 
-Every student receives a **Risk Score on a scale of 0 to 100**. A higher score means higher risk. The score is recalculated every 24 hours (or whenever new data is entered). The score maps to four risk levels:
+Every student receives a **Risk Score on a scale of 0 to 100**. A higher score means higher risk. The score is recalculated every 24 hours (or whenever new data is entered). The score maps to three risk levels:
 
 | Risk Level | Score Range | Color Code | Meaning |
 |---|---|---|---|
 | 🟢 Low Risk | 0 – 25 | Green | Student is performing well. No immediate action needed. |
 | 🟡 Medium Risk | 26 – 50 | Yellow / Amber | Student shows some warning signs. Mentor should monitor closely. |
-| 🟠 High Risk | 51 – 75 | Orange | Student is clearly struggling. Mentor should reach out and intervene. |
-| 🔴 Critical Risk | 76 – 100 | Red | Student is in serious academic danger. Immediate intervention required. |
+| 🟠 High Risk | 51 – 100 | Orange | Student is clearly struggling. Mentor should reach out and intervene quickly. |
 
 ### 5.2 Risk Factors & Weights
 
@@ -253,7 +252,7 @@ Add all weighted factor scores together to get a total value between 0 and 1.
 Multiply the total by 100 and round to the nearest whole number to get the final **Risk Score**.
 
 #### Step 5 — Assign Risk Level
-Based on the score, assign **Low / Medium / High / Critical** as described in Section 5.1.
+Based on the score, assign **Low / Medium / High** as described in Section 5.1.
 
 ---
 
@@ -285,7 +284,7 @@ The Faculty Mentor Dashboard is the primary tool for mentors to monitor their as
 ### 6.2 Page Layout
 The dashboard is a single-page view with the following sections:
 - **Top bar** — Mentor name, date, department, notification bell icon.
-- **Summary cards** — Total Mentees | At-Risk Count | High/Critical Count | Pending Interventions.
+- **Summary cards** — Total Mentees | At-Risk Count | High-Risk Count | Pending Interventions.
 - **Filter bar** — Filter by Class/Batch, Subject, Risk Level, Semester.
 - **Student risk table** — Main content listing all mentees.
 - **Quick-action buttons** — Per student row.
@@ -297,7 +296,7 @@ The dashboard is a single-page view with the following sections:
 | Student Name | Full name, clickable to open profile | Text link |
 | Student ID | Unique enrollment number | Text |
 | Risk Score | Current numeric score (0–100) | Number + colored badge |
-| Risk Level | Low / Medium / High / Critical | Color-coded pill label |
+| Risk Level | Low / Medium / High | Color-coded pill label |
 | Attendance % | Current attendance percentage | Number (red if below 75%) |
 | Assignments Pending | Count of unsubmitted assignments | Number |
 | Last Updated | When the risk score was last recalculated | Date/time |
@@ -312,7 +311,7 @@ A dropdown listing all classes/batches assigned to the mentor. Selecting a class
 Filters the risk table to highlight students at risk specifically in a chosen subject. This uses subject-specific sub-scores rather than the overall score.
 
 #### Risk Level Filter
-A multi-select filter allowing the mentor to show only students of specific risk levels. For example, selecting **"High"** and **"Critical"** shows only the most urgent cases.
+A multi-select filter allowing the mentor to show only students of specific risk levels. For example, selecting **"High"** shows only the most urgent cases.
 
 #### Semester Filter
 Filters by semester. Useful for coordinators overseeing multiple batches.
@@ -516,7 +515,7 @@ Each teacher has access to a subject-level performance dashboard showing:
 - Distribution chart (bar chart showing how many students scored in each 10% range).
 - List of students below passing threshold (highlighted in red).
 - Assignment submission rate (e.g., *"6 out of 32 students have not submitted Assignment 3"*).
-- Subject-wise risk summary: count of students at Low / Medium / High / Critical risk in this subject.
+- Subject-wise risk summary: count of students at Low / Medium / High risk in this subject.
 
 ### 11.4 Student Flagging
 Teachers can manually flag a student as needing attention. This flag:
@@ -586,7 +585,7 @@ The Automated Alert System ensures that faculty mentors are notified of high-ris
 | Trigger Condition | Alert Recipient | Priority | Channel |
 |---|---|---|---|
 | Risk score crosses 51 (enters High Risk) | Assigned Mentor | 🟠 High | In-App + Email |
-| Risk score crosses 76 (enters Critical Risk) | Mentor + Coordinator | 🔴 Critical | In-App + Email + SMS |
+| Risk score crosses 90 (escalated High Risk) | Mentor + Coordinator | 🟠 High | In-App + Email + SMS |
 | Attendance drops below 65% | Assigned Mentor | 🟠 High | In-App + Email |
 | Student misses 3+ consecutive assignments | Assigned Mentor | 🟡 Medium | In-App |
 | No LMS login for 7 consecutive days | Assigned Mentor | 🟡 Medium | In-App + Email |
@@ -596,7 +595,7 @@ The Automated Alert System ensures that faculty mentors are notified of high-ris
 
 ### 13.3 Alert Message Structure
 Each alert contains:
-- Alert heading (e.g., **"CRITICAL RISK ALERT — Immediate Action Required"**).
+- Alert heading (e.g., **"HIGH RISK ALERT — Immediate Action Required"**).
 - Student name and ID.
 - Current risk score and risk level.
 - Brief explanation of what triggered the alert.
@@ -680,7 +679,7 @@ In a 24-hour hackathon, focus on showcasing the core functionality that demonstr
 - Attendance data for the past 8 weeks (generate mix of 50%–90% attendance per student).
 - 3 assessment results per subject (Unit 1, Unit 2, Mid-term).
 - Assignment data: 3 assignments per subject, mix of submitted/late/missing.
-- **5 students in High/Critical risk range** for demo impact.
+- **5 students in High-risk range** for demo impact.
 - 3 pre-logged interventions with post-comparison data showing improvement.
 - 2 unactioned alerts in the Alerts inbox.
 
@@ -726,11 +725,11 @@ Use this checklist during your hackathon demo to ensure all judging criteria are
 
 - [ ] Show risk score on student profile — explain it is a 5-factor weighted calculation.
 - [ ] Show explanation section with top reasons and plain-English descriptions.
-- [ ] Demonstrate faculty dashboard filters — filter by High/Critical risk.
+- [ ] Demonstrate faculty dashboard filters — filter by High risk.
 - [ ] Click on a high-risk student and walk through their full profile.
 - [ ] Log a new intervention for a student using the modal form.
 - [ ] Show the pre/post comparison table for a student who previously received an intervention.
-- [ ] Show the alerts inbox — demonstrate an unactioned critical alert.
+- [ ] Show the alerts inbox — demonstrate an unactioned high-risk alert.
 - [ ] Download a PDF/CSV report for the class.
 - [ ] Show the student self-view portal — student sees their own score and improvement suggestions.
 
@@ -741,13 +740,13 @@ Use this checklist during your hackathon demo to ensure all judging criteria are
 | Term | Definition |
 |---|---|
 | **Academic Risk Score** | A numeric value (0–100) representing how likely a student is to face academic failure, calculated from multiple weighted indicators. |
-| **At-Risk Student** | A student with a Risk Score above 25 (Medium, High, or Critical risk level). |
+| **At-Risk Student** | A student with a Risk Score above 25 (Medium or High risk level). |
 | **Explanation Engine** | The component that translates a risk score into plain-language reasons with current and required values. |
 | **Intervention** | Any action taken by a mentor to support an at-risk student, such as counselling, remedial class, or assignment extension. |
 | **Pre/Post Comparison** | A side-by-side data comparison of a student's academic metrics before and after an intervention was conducted. |
 | **LMS** | Learning Management System — the digital platform used by the institution for course content, assignments, and learning activities (e.g., Moodle). |
 | **RBAC** | Role-Based Access Control — a security model that restricts system access based on the user's assigned role. |
-| **Risk Level** | A categorical classification of risk: Low (0–25), Medium (26–50), High (51–75), Critical (76–100). |
+| **Risk Level** | A categorical classification of risk: Low (0–25), Medium (26–50), High (51–100). |
 | **Snapshot** | A point-in-time capture of a student's academic metrics, stored permanently for comparison purposes. |
 | **Threshold** | The minimum acceptable value for a given academic indicator below which a factor contributes to risk. |
 | **Faculty Mentor** | A faculty member assigned to personally guide and support a group of students academically. |

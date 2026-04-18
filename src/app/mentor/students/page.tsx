@@ -11,8 +11,8 @@ interface StudentRow { id: string; name: string; studentId: string; batch: strin
 
 // ─── Dummy Data ───────────────────────────────────────────
 const DUMMY_STUDENTS: StudentRow[] = [
-  { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', semester: 3, attendance: 38, marks: 22, riskScore: 82, riskLevel: 'critical' },
-  { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', semester: 3, attendance: 35, marks: 18, riskScore: 78, riskLevel: 'critical' },
+  { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', semester: 3, attendance: 38, marks: 22, riskScore: 82, riskLevel: 'high' },
+  { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', semester: 3, attendance: 35, marks: 18, riskScore: 78, riskLevel: 'high' },
   { id: '3', name: 'Arjun Mehta', studentId: '22CE001', batch: 'CE-A', semester: 3, attendance: 45, marks: 28, riskScore: 68, riskLevel: 'high' },
   { id: '4', name: 'Hinal Bhatt', studentId: '22CE008', batch: 'CE-A', semester: 3, attendance: 50, marks: 32, riskScore: 62, riskLevel: 'high' },
   { id: '5', name: 'Raj Thakkar', studentId: '22CE016', batch: 'CE-B', semester: 3, attendance: 55, marks: 30, riskScore: 58, riskLevel: 'high' },
@@ -29,7 +29,6 @@ const RISK_CFG: Record<string, { bg: string; text: string; border: string }> = {
   low:      { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   medium:   { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
   high:     { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
-  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
 };
 
 function RiskBadge({ level }: { level: string }) {
@@ -108,7 +107,7 @@ export default function StudentsPage() {
           <div className="h-8 w-px bg-gray-200 hidden sm:block" />
 
           <div className="flex bg-gray-100/50 p-1 rounded-xl w-full sm:w-auto">
-            {['all', 'low', 'medium', 'high', 'critical'].map(r => (
+            {['all', 'low', 'medium', 'high'].map(r => (
               <button key={r} onClick={() => setRiskFilter(r)}
                 className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${riskFilter === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>
                 {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -154,7 +153,7 @@ export default function StudentsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((s) => {
-                    const isHigh = s.riskLevel === 'high' || s.riskLevel === 'critical';
+                    const isHigh = s.riskLevel === 'high';
                     return (
                       <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isHigh ? 'bg-red-50/20' : 'hover:bg-gray-50/50'}`}>
                         <td className="px-6 py-4">

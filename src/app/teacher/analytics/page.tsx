@@ -15,7 +15,7 @@ import {
   Legend,
 } from 'recharts';
 
-type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+type RiskLevel = 'Low' | 'Medium' | 'High';
 
 interface AnalyticsPayload {
   teacher: {
@@ -115,7 +115,6 @@ function RiskBadge({ level }: { level: RiskLevel }) {
     Low: 'bg-green-50 text-green-700 border-green-200',
     Medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
     High: 'bg-orange-50 text-orange-700 border-orange-200',
-    Critical: 'bg-red-50 text-red-700 border-red-200',
   };
 
   return <span className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-semibold ${cfg[level]}`}>{level}</span>;

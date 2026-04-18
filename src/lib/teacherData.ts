@@ -1,6 +1,6 @@
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+export type RiskLevel = 'Low' | 'Medium' | 'High';
 export type SubmissionStatus = 'On Time' | 'Late' | 'Not Submitted';
 
 export interface Student {
@@ -268,6 +268,5 @@ export function computeSubjectPercentage(
 export function getRiskLevel(pct: number): RiskLevel {
   if (pct >= 75) return 'Low';
   if (pct >= 50) return 'Medium';
-  if (pct >= 40) return 'High';
-  return 'Critical';
+  return 'High';
 }

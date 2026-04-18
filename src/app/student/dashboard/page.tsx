@@ -93,10 +93,9 @@ function RiskBadge({ level }: { level: RiskLevel }) {
     Low:      'bg-emerald-50 text-emerald-700 border-emerald-200',
     Medium:   'bg-amber-50 text-amber-700 border-amber-200',
     High:     'bg-orange-50 text-orange-700 border-orange-200',
-    Critical: 'bg-red-50 text-red-700 border-red-200',
   };
   const dots = {
-    Low: 'bg-emerald-500', Medium: 'bg-amber-500', High: 'bg-orange-500', Critical: 'bg-red-500',
+    Low: 'bg-emerald-500', Medium: 'bg-amber-500', High: 'bg-orange-500',
   };
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${cfg[level]}`}>
@@ -111,7 +110,7 @@ export default function StudentDashboard() {
   // SVG Donut metrics
   const score = RISK_SCORE_DATA.score;
   const strokeDasharray = `${(score / 100) * 283} 283`;
-  const strokeColor = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : score >= 40 ? '#f97316' : '#ef4444';
+  const strokeColor = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f97316';
 
   return (
     <div className="flex flex-col flex-1">
@@ -354,7 +353,7 @@ export default function StudentDashboard() {
               {ALERTS.slice(0, 3).map(alert => (
                 <div key={alert.id} className={`p-4 rounded-xl border flex gap-3 ${alert.isRead ? 'bg-gray-50 border-gray-100' : 'bg-blue-50/30 border-blue-100'}`}>
                   <div className="mt-1">
-                    {alert.priority === 'Critical' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : <Calendar className="w-4 h-4 text-blue-500" />}
+                    {alert.priority === 'High' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : <Calendar className="w-4 h-4 text-blue-500" />}
                   </div>
                   <div>
                     <div className="flex justify-between items-start mb-1">

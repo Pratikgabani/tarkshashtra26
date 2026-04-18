@@ -179,7 +179,7 @@ export async function POST() {
 
       for (let w = 8; w >= 0; w--) {
         const score = Math.max(0, Math.min(100, clampedBase + rand(-5, 5) + (w * 2)));
-        const riskLevel = score <= 25 ? "low" : score <= 50 ? "medium" : score <= 75 ? "high" : "critical";
+        const riskLevel = score <= 25 ? "low" : score <= 50 ? "medium" : "high";
 
         await RiskScore.create({
           studentId: studentDocs[si]._id,
@@ -255,7 +255,7 @@ export async function POST() {
       mentorId: mentor._id,
       studentId: studentDocs[9]._id,
       actionType: "parent_meeting",
-      description: "Scheduled parent meeting to discuss critical academic performance.",
+      description: "Scheduled parent meeting to discuss high-risk academic performance.",
       date: sub(now, -2),
       status: "scheduled",
     });

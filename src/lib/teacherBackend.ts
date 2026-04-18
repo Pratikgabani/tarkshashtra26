@@ -5,7 +5,7 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
 
-export type UiRiskLevel = "Low" | "Medium" | "High" | "Critical";
+export type UiRiskLevel = "Low" | "Medium" | "High";
 export type UiSubmissionStatus = "On Time" | "Late" | "Not Submitted";
 export type UiAssessmentId = "ut1" | "ut2" | "mid";
 
@@ -168,8 +168,7 @@ export function uiSubmissionStatusToDbStatus(status: UiSubmissionStatus): DbSubm
 export function getRiskLevelFromPercentage(percentage: number): UiRiskLevel {
   if (percentage >= 75) return "Low";
   if (percentage >= 50) return "Medium";
-  if (percentage >= 40) return "High";
-  return "Critical";
+  return "High";
 }
 
 export function calculateSubjectPercentage(

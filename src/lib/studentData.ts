@@ -1,4 +1,4 @@
-export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+export type RiskLevel = 'Low' | 'Medium' | 'High';
 
 export const STUDENT_INFO = {
   id: 'S1042',
@@ -100,7 +100,7 @@ export const SUBJECT_DETAILS = {
 };
 
 export const ALERTS = [
-  { id: 'a1', title: 'CRITICAL RISK ALERT', message: 'Your attendance in Data Structures has fallen below the mandatory 75% threshold.', dateTime: '2 hours ago', priority: 'Critical', isRead: false },
+  { id: 'a1', title: 'HIGH RISK ALERT', message: 'Your attendance in Data Structures has fallen below the mandatory 75% threshold.', dateTime: '2 hours ago', priority: 'High', isRead: false },
   { id: 'a2', title: 'Missing Assignment', message: 'You have not submitted the "Stack & Queue" assignment for Data Structures.', dateTime: 'Yesterday', priority: 'High', isRead: false },
   { id: 'a3', title: 'Meeting Scheduled', message: 'Your mentor has scheduled a check-in meeting for tomorrow at 2:00 PM.', dateTime: '2 days ago', priority: 'Medium', isRead: true },
   { id: 'a4', title: 'Unit Test Marks Updated', message: 'Marks for OOP Unit Test 2 have been uploaded by Prof. V. Patel.', dateTime: '1 week ago', priority: 'Low', isRead: true },

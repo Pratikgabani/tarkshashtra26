@@ -26,7 +26,6 @@ function RiskBadge({ level }: { level: RiskLevel }) {
     Low:      'bg-emerald-50 text-emerald-700 border-emerald-200',
     Medium:   'bg-amber-50 text-amber-700 border-amber-200',
     High:     'bg-orange-50 text-orange-700 border-orange-200',
-    Critical: 'bg-red-50 text-red-700 border-red-200',
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border tracking-wide ${cfg[level]}`}>
@@ -172,7 +171,7 @@ export default function CoordinatorStudents() {
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Risks</option>
-              {['Critical', 'High', 'Medium', 'Low'].map(r => <option key={r} value={r}>{r}</option>)}
+              {['High', 'Medium', 'Low'].map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
         </div>
@@ -202,7 +201,7 @@ export default function CoordinatorStudents() {
                   </tr>
                 ) : (
                   filteredStudents.map(s => (
-                    <tr key={s.id} className={`hover:bg-[#F9FAFB]/50 transition-colors ${s.riskLevel === 'Critical' ? 'bg-red-50/20' : ''}`}>
+                    <tr key={s.id} className={`hover:bg-[#F9FAFB]/50 transition-colors ${s.riskLevel === 'High' ? 'bg-red-50/20' : ''}`}>
                       <td className="px-5 py-4">
                         <div className="text-[13px] font-bold text-[#111827]">{s.name}</div>
                         <div className="text-[11px] font-medium text-[#6B7280] mt-0.5">{s.id}</div>
@@ -220,13 +219,11 @@ export default function CoordinatorStudents() {
                       <td className="px-5 py-4">
                         <span
                           className={`text-[14px] font-black ${
-                            s.riskLevel === 'Critical'
+                            s.riskLevel === 'High'
                               ? 'text-[#EF4444]'
-                              : s.riskLevel === 'High'
+                              : s.riskLevel === 'Medium'
                                 ? 'text-[#F97316]'
-                                : s.riskLevel === 'Medium'
-                                  ? 'text-[#D97706]'
-                                  : 'text-[#10B981]'
+                                : 'text-[#10B981]'
                           }`}
                         >
                           {s.riskScore}

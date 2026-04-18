@@ -31,7 +31,7 @@ interface TeacherAssessment {
 
 type TeacherMarksMap = Record<string, Record<string, Record<'ut1' | 'ut2' | 'mid', number | null>>>;
 
-type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+type RiskLevel = 'Low' | 'Medium' | 'High';
 
 interface TeacherDashboardData {
   teacher: TeacherIdentity;
@@ -81,7 +81,6 @@ function RiskBadge({ level }: { level: RiskLevel }) {
     Low: 'bg-green-50 text-green-700 border-green-200',
     Medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
     High: 'bg-orange-50 text-orange-700 border-orange-200',
-    Critical: 'bg-red-50 text-red-700 border-red-200',
   };
 
   return (
@@ -94,8 +93,7 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 function getRiskLevel(percentage: number): RiskLevel {
   if (percentage >= 75) return 'Low';
   if (percentage >= 50) return 'Medium';
-  if (percentage >= 40) return 'High';
-  return 'Critical';
+  return 'High';
 }
 
 function computeSubjectPercentage(

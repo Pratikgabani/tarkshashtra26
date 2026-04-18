@@ -5,7 +5,7 @@ import RiskScore from "@/src/models/riskScore";
 import StudentAssignment from "@/src/models/studentAssignment";
 import User from "@/src/models/user";
 
-export type CoordinatorRiskLevel = "Low" | "Medium" | "High" | "Critical";
+export type CoordinatorRiskLevel = "Low" | "Medium" | "High";
 
 export interface CoordinatorStudentRecord {
   id: string;
@@ -33,7 +33,6 @@ export interface CoordinatorRiskDistribution {
   Low: number;
   Medium: number;
   High: number;
-  Critical: number;
 }
 
 export interface CoordinatorSystemAggregates {
@@ -59,29 +58,26 @@ function roundPercent(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 100);
 }
 
-function mapDbRiskLevel(level: string | undefined): CoordinatorRiskLevel {
+function mapDbRiskLevel(level: string | undefined): CoordinatorRiskLevel | null {
   switch ((level || "").toLowerCase()) {
-    case "critical":
-      return "Critical";
     case "high":
       return "High";
     case "medium":
       return "Medium";
     case "low":
-    default:
       return "Low";
+    default:
+      return null;
   }
 }
 
 function riskLevelFromHealthScore(score: number): CoordinatorRiskLevel {
-  if (score < 40) return "Critical";
   if (score < 60) return "High";
   if (score < 75) return "Medium";
   return "Low";
 }
 
 function predictedDbLevelLowWorse(score: number): string {
-  if (score < 40) return "critical";
   if (score < 60) return "high";
   if (score < 75) return "medium";
   return "low";
@@ -90,8 +86,7 @@ function predictedDbLevelLowWorse(score: number): string {
 function predictedDbLevelHighWorse(score: number): string {
   if (score <= 25) return "low";
   if (score <= 50) return "medium";
-  if (score <= 75) return "high";
-  return "critical";
+  return "high";
 }
 
 function normalizeRiskToHealthScore(score: number, riskLevel?: string): number {
@@ -294,9 +289,8 @@ export async function buildCoordinatorStudentRecords(): Promise<CoordinatorStude
       ? normalizeRiskToHealthScore(latestRisk.score, latestRisk.riskLevel)
       : calculateHealthScoreFromInputs(attendance, avgMarks, assignmentCompletionRate);
 
-    const riskLevel = latestRisk
-      ? mapDbRiskLevel(latestRisk.riskLevel)
-      : riskLevelFromHealthScore(healthScore);
+    const mappedRiskLevel = latestRisk ? mapDbRiskLevel(latestRisk.riskLevel) : null;
+    const riskLevel = mappedRiskLevel || riskLevelFromHealthScore(healthScore);
 
     return {
       id: (student.studentId || dbId).trim(),
@@ -328,21 +322,20 @@ export function buildSystemAggregates(
     Low: 0,
     Medium: 0,
     High: 0,
-    Critical: 0,
   };
 
   for (const student of students) {
     riskDist[student.riskLevel] += 1;
   }
 
-  const atRisk = riskDist.High + riskDist.Critical;
+  const atRisk = riskDist.High;
 
   const departmentMap = new Map<string, { total: number; atRisk: number }>();
   for (const student of students) {
     const key = student.department;
     const existing = departmentMap.get(key) || { total: 0, atRisk: 0 };
     existing.total += 1;
-    if (student.riskLevel === "High" || student.riskLevel === "Critical") {
+    if (student.riskLevel === "High") {
       existing.atRisk += 1;
     }
     departmentMap.set(key, existing);
@@ -421,7 +414,7 @@ export async function buildAtRiskTrend(
         _id: "$_id.monthKey",
         atRisk: {
           $sum: {
-            $cond: [{ $in: ["$doc.riskLevel", ["high", "critical"]] }, 1, 0],
+            $cond: [{ $in: ["$doc.riskLevel", ["high"]] }, 1, 0],
           },
         },
       },
@@ -456,7 +449,7 @@ export function buildClassStats(students: CoordinatorStudentRecord[]): Array<{
     const stats = classMap.get(key) || { marksTotal: 0, count: 0, atRisk: 0 };
     stats.marksTotal += student.avgMarks;
     stats.count += 1;
-    if (student.riskLevel === "High" || student.riskLevel === "Critical") {
+    if (student.riskLevel === "High") {
       stats.atRisk += 1;
     }
     classMap.set(key, stats);
@@ -472,7 +465,6 @@ export function buildClassStats(students: CoordinatorStudentRecord[]): Array<{
 }
 
 function scoreSeverity(level: CoordinatorRiskLevel): number {
-  if (level === "Critical") return 4;
   if (level === "High") return 3;
   if (level === "Medium") return 2;
   return 1;
@@ -656,7 +648,7 @@ export async function buildCoordinatorInterventions(limit = 300): Promise<{
 
 export function buildTopRiskStudents(students: CoordinatorStudentRecord[], count = 5): CoordinatorStudentRecord[] {
   return [...students]
-    .filter((student) => student.riskLevel === "High" || student.riskLevel === "Critical")
+    .filter((student) => student.riskLevel === "High")
     .sort((a, b) => {
       const severityDiff = scoreSeverity(b.riskLevel) - scoreSeverity(a.riskLevel);
       if (severityDiff !== 0) return severityDiff;

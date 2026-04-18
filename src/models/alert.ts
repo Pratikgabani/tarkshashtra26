@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export type AlertPriority = "low" | "medium" | "high" | "critical";
+export type AlertPriority = "low" | "medium" | "high";
 export type AlertStatus = "unread" | "acknowledged" | "actioned";
 
 export interface IAlert extends Document {
@@ -23,7 +23,7 @@ const AlertSchema: Schema<IAlert> = new Schema(
     type: { type: String, required: true },
     priority: {
       type: String,
-      enum: ["low", "medium", "high", "critical"],
+      enum: ["low", "medium", "high"],
       required: true,
     },
     title: { type: String, required: true },

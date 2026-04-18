@@ -183,7 +183,7 @@ Use the following **professional SaaS color palette only**:
 
 ---
 
-# 🚀 HACKATHON STRATEGY (CRITICAL)
+# 🚀 HACKATHON STRATEGY (IMPORTANT)
 
 * Prioritize:
 

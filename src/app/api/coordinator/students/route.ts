@@ -6,10 +6,9 @@ import {
   type CoordinatorRiskLevel,
 } from "@/src/lib/coordinatorBackend";
 
-const VALID_RISK_FILTERS = new Set(["all", "low", "medium", "high", "critical"]);
+const VALID_RISK_FILTERS = new Set(["all", "low", "medium", "high"]);
 
 function severity(level: CoordinatorRiskLevel): number {
-  if (level === "Critical") return 4;
   if (level === "High") return 3;
   if (level === "Medium") return 2;
   return 1;
@@ -70,7 +69,7 @@ export async function GET(request: NextRequest) {
         filters: {
           departments,
           classes,
-          riskLevels: ["Critical", "High", "Medium", "Low"],
+          riskLevels: ["High", "Medium", "Low"],
         },
         summary: {
           total: students.length,

@@ -1,6 +1,6 @@
 // Coordinator Mock Data Repository
 
-export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+export type RiskLevel = 'Low' | 'Medium' | 'High';
 export type Department = 'Computer Eng.' | 'Mechanical Eng.' | 'Civil Eng.' | 'Electrical Eng.';
 export type UserRole = 'Student' | 'Teacher' | 'Mentor';
 
@@ -60,8 +60,7 @@ export function calculateRisk(attendance: number, marks: number, assignmentsRate
   score = Math.max(0, Math.min(100, Math.round(score)));
   
   let level: RiskLevel = 'Low';
-  if (score < 40) level = 'Critical';
-  else if (score < 60) level = 'High';
+  if (score < 60) level = 'High';
   else if (score < 75) level = 'Medium';
   
   return {
@@ -154,18 +153,17 @@ export const MOCK_USERS: UserRecord[] = [
 // Aggregation Helpers
 export function getSystemAggregates() {
   const total = MOCK_STUDENTS.length;
-  const atRisk = MOCK_STUDENTS.filter(s => s.riskLevel === 'High' || s.riskLevel === 'Critical').length;
+  const atRisk = MOCK_STUDENTS.filter(s => s.riskLevel === 'High').length;
   
   const riskDist = {
     Low: MOCK_STUDENTS.filter(s => s.riskLevel === 'Low').length,
     Medium: MOCK_STUDENTS.filter(s => s.riskLevel === 'Medium').length,
     High: MOCK_STUDENTS.filter(s => s.riskLevel === 'High').length,
-    Critical: MOCK_STUDENTS.filter(s => s.riskLevel === 'Critical').length,
   };
 
   const deptStats = DEPARTMENTS.map(d => {
     const deptStudents = MOCK_STUDENTS.filter(s => s.department === d);
-    const deptAtRisk = deptStudents.filter(s => s.riskLevel === 'High' || s.riskLevel === 'Critical').length;
+    const deptAtRisk = deptStudents.filter(s => s.riskLevel === 'High').length;
     return {
       department: d,
       total: deptStudents.length,

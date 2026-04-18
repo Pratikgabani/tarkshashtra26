@@ -27,7 +27,6 @@ interface DashboardPayload {
     Low: number;
     Medium: number;
     High: number;
-    Critical: number;
   };
   deptStats: Array<{
     department: string;
@@ -78,7 +77,6 @@ export default function CoordinatorDashboard() {
               Low: Number(json.data.riskDist?.Low) || 0,
               Medium: Number(json.data.riskDist?.Medium) || 0,
               High: Number(json.data.riskDist?.High) || 0,
-              Critical: Number(json.data.riskDist?.Critical) || 0,
             },
             deptStats: Array.isArray(json.data.deptStats) ? json.data.deptStats : [],
             trend: Array.isArray(json.data.trend) ? json.data.trend : [],
@@ -105,7 +103,6 @@ export default function CoordinatorDashboard() {
     { name: 'Low Risk', value: riskDist.Low, color: '#10B981' },
     { name: 'Medium Risk', value: riskDist.Medium, color: '#F59E0B' },
     { name: 'High Risk', value: riskDist.High, color: '#F97316' },
-    { name: 'Critical Risk', value: riskDist.Critical, color: '#EF4444' },
   ];
 
   const trendData = trend.length > 0 ? trend : buildFallbackData().trend;
@@ -153,8 +150,8 @@ export default function CoordinatorDashboard() {
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">Critical Cases</p>
-                <p className="text-3xl font-black text-[#111827]">{riskDist.Critical}</p>
+                <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">High-Risk Cases</p>
+                <p className="text-3xl font-black text-[#111827]">{riskDist.High}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                 <Activity className="w-5 h-5 text-[#6B7280]" />

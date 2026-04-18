@@ -15,6 +15,24 @@ interface PopulatedAssignmentRef {
   dueDate?: Date;
 }
 
+interface InterventionComparison {
+  actionId: string;
+  actionType: string;
+  actionDate: string;
+  before: {
+    score: number;
+    riskLevel: string;
+    calculatedAt: string;
+  };
+  after: {
+    score: number;
+    riskLevel: string;
+    calculatedAt: string;
+  };
+  delta: number;
+  trend: "improved" | "worsened" | "unchanged";
+}
+
 /**
  * GET /api/mentor/students/[id]?mentorId=xxx
  * Full student detail for mentor view.
@@ -121,6 +139,39 @@ export async function GET(
       .sort({ createdAt: -1 })
       .lean();
 
+    const interventionComparison: InterventionComparison[] = actions
+      .map((action) => {
+        const actionDate = new Date(action.date);
+        const before = [...riskHistory]
+          .reverse()
+          .find((entry) => entry.calculatedAt <= actionDate);
+        const after = riskHistory.find((entry) => entry.calculatedAt > actionDate);
+
+        if (!before || !after) return null;
+
+        const delta = Math.round((after.score - before.score) * 100) / 100;
+        const trend = delta < 0 ? "improved" : delta > 0 ? "worsened" : "unchanged";
+
+        return {
+          actionId: action._id.toString(),
+          actionType: action.actionType,
+          actionDate: actionDate.toISOString(),
+          before: {
+            score: before.score,
+            riskLevel: before.riskLevel,
+            calculatedAt: before.calculatedAt.toISOString(),
+          },
+          after: {
+            score: after.score,
+            riskLevel: after.riskLevel,
+            calculatedAt: after.calculatedAt.toISOString(),
+          },
+          delta,
+          trend,
+        };
+      })
+      .filter((entry): entry is InterventionComparison => entry !== null);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -175,6 +226,7 @@ export async function GET(
               createdAt: r.createdAt.toISOString(),
             })),
         })),
+        interventionComparison,
       },
     });
   } catch (error) {

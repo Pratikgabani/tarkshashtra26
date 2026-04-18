@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         summary: {
           totalStudents: aggregates.total,
           atRiskStudents: aggregates.atRisk,
-          criticalCases: aggregates.riskDist.Critical,
+          highRiskCases: aggregates.riskDist.High,
           departments: aggregates.deptStats.length,
         },
         total: aggregates.total,

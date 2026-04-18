@@ -28,7 +28,6 @@ interface ReportsPayload {
       Low: number;
       Medium: number;
       High: number;
-      Critical: number;
     };
   };
   students: StudentRecord[];
@@ -39,7 +38,7 @@ interface ReportsPayload {
 function buildFallbackReports(): ReportsPayload {
   const { total, atRisk, riskDist } = getSystemAggregates();
   const topRiskStudents = MOCK_STUDENTS
-    .filter((student) => student.riskLevel === 'Critical' || student.riskLevel === 'High')
+    .filter((student) => student.riskLevel === 'High')
     .sort((a, b) => a.riskScore - b.riskScore)
     .slice(0, 5);
 
@@ -90,7 +89,6 @@ export default function ReportsPage() {
                 Low: Number(summary.riskDist?.Low) || 0,
                 Medium: Number(summary.riskDist?.Medium) || 0,
                 High: Number(summary.riskDist?.High) || 0,
-                Critical: Number(summary.riskDist?.Critical) || 0,
               },
             },
             students,
@@ -199,7 +197,7 @@ export default function ReportsPage() {
               <FileText className="w-6 h-6 text-red-600" />
             </div>
             <h3 className="text-lg font-bold text-[#111827] mb-1">PDF Summary Report</h3>
-            <p className="text-[13px] text-[#6B7280] font-medium mb-6">Generate a printable summary report highlighting aggregate analytics and critical figures.</p>
+            <p className="text-[13px] text-[#6B7280] font-medium mb-6">Generate a printable summary report highlighting aggregate analytics and high-risk figures.</p>
             <button 
               onClick={handleDownloadPDF}
               className="flex items-center gap-2 bg-[#FFFFFF] border border-[#E5E7EB] hover:bg-[#F9FAFB] text-[#111827] px-5 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm"
@@ -219,10 +217,10 @@ export default function ReportsPage() {
            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
              <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{summary.total}</p></div>
              <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{summary.atRisk}</p></div>
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Critical Tier</p><p className="text-2xl font-black text-[#111827]">{summary.riskDist.Critical}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">High-Risk Tier</p><p className="text-2xl font-black text-[#111827]">{summary.riskDist.High}</p></div>
            </div>
 
-           <h3 className="text-sm font-bold text-[#111827] mb-4 uppercase tracking-widest border-b border-[#E5E7EB] pb-2">High & Critical Risk Roster (Top 5)</h3>
+           <h3 className="text-sm font-bold text-[#111827] mb-4 uppercase tracking-widest border-b border-[#E5E7EB] pb-2">High Risk Roster (Top 5)</h3>
            <table className="w-full text-left border-collapse">
              <thead>
                <tr className="border-b border-[#E5E7EB]">

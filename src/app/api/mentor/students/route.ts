@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
 import RiskScore from "@/src/models/riskScore";
+import Subject from "@/src/models/subject";
+
+const VALID_RISK_FILTERS = new Set(["all", "low", "medium", "high"]);
 
 /**
  * GET /api/mentor/students?mentorId=xxx&risk=high&search=arjun
@@ -23,13 +27,29 @@ export async function GET(request: NextRequest) {
     if (!scopedMentorId.ok) return scopedMentorId.response;
     const mentorId = scopedMentorId.userId;
 
-    const riskFilter = request.nextUrl.searchParams.get("risk");
+    const riskFilter = (request.nextUrl.searchParams.get("risk") || "all").trim().toLowerCase();
     const search = request.nextUrl.searchParams.get("search");
     const batch = request.nextUrl.searchParams.get("batch");
+    const semester = request.nextUrl.searchParams.get("semester");
+    const subject = request.nextUrl.searchParams.get("subject");
     const sanitizedBatch = batch?.trim();
+    const sanitizedSubject = subject?.trim();
+
+    if (!VALID_RISK_FILTERS.has(riskFilter)) {
+      return NextResponse.json({ success: false, message: "Invalid risk filter" }, { status: 400 });
+    }
 
     if (sanitizedBatch && !/^[A-Za-z0-9-]{1,20}$/.test(sanitizedBatch)) {
       return NextResponse.json({ success: false, message: "Invalid batch filter" }, { status: 400 });
+    }
+
+    let sanitizedSemester: number | undefined;
+    if (semester?.trim()) {
+      const parsedSemester = Number(semester);
+      if (!Number.isInteger(parsedSemester) || parsedSemester < 1 || parsedSemester > 8) {
+        return NextResponse.json({ success: false, message: "Invalid semester filter" }, { status: 400 });
+      }
+      sanitizedSemester = parsedSemester;
     }
 
     // Build student query
@@ -39,9 +59,64 @@ export async function GET(request: NextRequest) {
       query.fullName = { $regex: escapedSearch, $options: "i" };
     }
     if (sanitizedBatch) query.batch = sanitizedBatch;
+    if (sanitizedSemester !== undefined) query.semester = sanitizedSemester;
 
     const students = await User.find(query).lean();
-    const studentIds = students.map((s) => s._id);
+
+    let filteredStudents = students;
+    if (sanitizedSubject) {
+      const matchedSubjectIds = new Set<string>();
+
+      if (mongoose.Types.ObjectId.isValid(sanitizedSubject)) {
+        matchedSubjectIds.add(sanitizedSubject);
+      }
+
+      const escapedSubject = sanitizedSubject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const matchingSubjects = await Subject.find(
+        {
+          $or: [
+            { name: { $regex: `^${escapedSubject}$`, $options: "i" } },
+            { code: { $regex: `^${escapedSubject}$`, $options: "i" } },
+          ],
+        },
+        { _id: 1 }
+      ).lean();
+
+      for (const matched of matchingSubjects) {
+        matchedSubjectIds.add(matched._id.toString());
+      }
+
+      if (matchedSubjectIds.size === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+
+      const subjectObjectIds = Array.from(matchedSubjectIds, (id) => new mongoose.Types.ObjectId(id));
+      const studentIdsForSubjectFilter = students.map((s) => s._id);
+
+      const [assessmentStudents, attendanceStudents] = await Promise.all([
+        Assessment.distinct("studentId", {
+          studentId: { $in: studentIdsForSubjectFilter },
+          subjectId: { $in: subjectObjectIds },
+        }),
+        Attendance.distinct("studentId", {
+          studentId: { $in: studentIdsForSubjectFilter },
+          subjectId: { $in: subjectObjectIds },
+        }),
+      ]);
+
+      const allowedStudentIds = new Set<string>([
+        ...assessmentStudents.map((id) => id.toString()),
+        ...attendanceStudents.map((id) => id.toString()),
+      ]);
+
+      filteredStudents = students.filter((student) => allowedStudentIds.has(student._id.toString()));
+    }
+
+    if (filteredStudents.length === 0) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    const studentIds = filteredStudents.map((s) => s._id);
 
     // Latest risk scores
     const riskScores = await RiskScore.aggregate([
@@ -66,7 +141,7 @@ export async function GET(request: NextRequest) {
     ]);
     const marksMap = new Map(marksAgg.map((m) => [m._id.toString(), Math.round((m.totalObtained / m.totalMax) * 100)]));
 
-    let result = students.map((s) => {
+    let result = filteredStudents.map((s) => {
       const risk = riskMap.get(s._id.toString());
       return {
         id: s._id.toString(),
@@ -82,7 +157,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Filter by risk level
-    if (riskFilter && riskFilter !== "all") {
+    if (riskFilter !== "all") {
       result = result.filter((s) => s.riskLevel === riskFilter);
     }
 

@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#6B7280' }} dy={15} />
                 <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#6B7280' }} dx={-10} />
                 <Tooltip content={<CustomChartTooltip />} />
-                <ReferenceLine y={40} stroke="#EF4444" strokeDasharray="4 4" label={{ position: 'top', value: '40% Critical Threshold', fill: '#EF4444', fontSize: 11, fontWeight: 800 }} />
+                <ReferenceLine y={40} stroke="#EF4444" strokeDasharray="4 4" label={{ position: 'top', value: '40% High-Risk Threshold', fill: '#EF4444', fontSize: 11, fontWeight: 800 }} />
                 <Area 
                   type="monotone" 
                   dataKey="score" 

@@ -26,8 +26,7 @@ export default function AlertsPage() {
 
   const getPriorityInfo = (priority: string) => {
     switch(priority) {
-      case 'Critical': return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
-      case 'High': return { icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
+      case 'High': return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
       case 'Medium': return { icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
       case 'Low': return { icon: FileText, color: 'text-gray-600', bg: 'bg-gray-100', border: 'border-gray-200' };
       default: return { icon: FileText, color: 'text-gray-600', bg: 'bg-gray-100', border: 'border-gray-200' };
@@ -42,7 +41,7 @@ export default function AlertsPage() {
         
         {/* Filters */}
         <div className="flex items-center gap-2 mb-8 border-b border-gray-200 pb-4">
-          {['All', 'Critical', 'High', 'Medium', 'Low'].map(f => (
+          {['All', 'High', 'Medium', 'Low'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, AlertCircle, AlertTriangle, ShieldAlert, CheckCircle2, Megaphone, Calendar, ArrowRight, UserCheck } from 'lucide-react';
+import { Users, AlertCircle, AlertTriangle, CheckCircle2, Megaphone, Calendar, ArrowRight, UserCheck } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────
 
-interface Summary { totalStudents: number; low: number; medium: number; high: number; critical: number; unreadAlerts: number; }
+interface Summary { totalStudents: number; low: number; medium: number; high: number; unreadAlerts: number; }
 interface StudentRow { id: string; name: string; studentId: string; batch: string; riskScore: number; riskLevel: string; }
 interface AlertItem { id: string; studentName: string; title: string; message: string; priority: string; status: string; sentAt: string; }
 interface ActionItem { id: string; studentName: string; actionType: string; description: string; date: string; status: string; }
@@ -23,10 +23,10 @@ interface DashboardData {
 
 const DUMMY: DashboardData = {
   mentor: { name: 'Dr. Rajesh Kumar', department: 'Computer Engineering' },
-  summary: { totalStudents: 12, low: 3, medium: 3, high: 4, critical: 2, unreadAlerts: 5 },
+  summary: { totalStudents: 12, low: 3, medium: 3, high: 6, unreadAlerts: 5 },
   students: [
-    { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', riskScore: 82, riskLevel: 'critical' },
-    { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', riskScore: 78, riskLevel: 'critical' },
+    { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', riskScore: 82, riskLevel: 'high' },
+    { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', riskScore: 78, riskLevel: 'high' },
     { id: '3', name: 'Arjun Mehta', studentId: '22CE001', batch: 'CE-A', riskScore: 68, riskLevel: 'high' },
     { id: '4', name: 'Hinal Bhatt', studentId: '22CE008', batch: 'CE-A', riskScore: 62, riskLevel: 'high' },
     { id: '5', name: 'Raj Thakkar', studentId: '22CE016', batch: 'CE-B', riskScore: 58, riskLevel: 'high' },
@@ -41,7 +41,7 @@ const DUMMY: DashboardData = {
   recentActions: [
     { id: 'ac1', studentName: 'Arjun Mehta', actionType: 'counseling', description: 'One-on-one counseling session to discuss attendance and academic performance.', date: '2026-04-08T10:00:00Z', status: 'completed' },
     { id: 'ac2', studentName: 'Amit Joshi', actionType: 'extra_class', description: 'Arranged extra Data Structures tutorial to help with fundamentals.', date: '2026-04-13T10:00:00Z', status: 'scheduled' },
-    { id: 'ac3', studentName: 'Pooja Verma', actionType: 'parent_meeting', description: 'Scheduled parent meeting to discuss critical academic performance.', date: '2026-04-20T10:00:00Z', status: 'scheduled' },
+    { id: 'ac3', studentName: 'Pooja Verma', actionType: 'parent_meeting', description: 'Scheduled parent meeting to discuss high-risk academic performance.', date: '2026-04-20T10:00:00Z', status: 'scheduled' },
     { id: 'ac4', studentName: 'Hinal Bhatt', actionType: 'academic_support', description: 'Assigned peer mentor for OS and Math subjects.', date: '2026-04-04T10:00:00Z', status: 'completed' },
   ],
 };
@@ -52,7 +52,6 @@ const RISK_CFG: Record<string, { bg: string; text: string; border: string }> = {
   low:      { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   medium:   { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
   high:     { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
-  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
 };
 
 function riskBadge(level: string) {
@@ -119,7 +118,7 @@ export default function MentorDashboard() {
 
   if (!data) return null;
   const { mentor, summary, students, recentAlerts, recentActions } = data;
-  const highRiskStudents = students.filter(s => s.riskLevel === 'high' || s.riskLevel === 'critical');
+  const highRiskStudents = students.filter(s => s.riskLevel === 'high');
 
   return (
     <div className="flex flex-col flex-1 bg-gray-50/30">
@@ -134,7 +133,7 @@ export default function MentorDashboard() {
             { label: 'Low Risk', value: summary.low, icon: <span className="text-emerald-500">●</span>, border: 'border-emerald-200' },
             { label: 'Medium Risk', value: summary.medium, icon: <span className="text-amber-500">●</span>, border: 'border-amber-200' },
             { label: 'High Risk', value: summary.high, icon: <AlertTriangle className="w-5 h-5 text-orange-500" />, border: 'border-orange-200' },
-            { label: 'Critical', value: summary.critical, icon: <ShieldAlert className="w-5 h-5 text-red-500" />, border: 'border-red-200' },
+            { label: 'Unread Alerts', value: summary.unreadAlerts, icon: <Megaphone className="w-5 h-5 text-blue-500" />, border: 'border-blue-200' },
           ].map((c) => (
             <div key={c.label} className={`bg-white rounded-xl border p-5 shadow-sm flex flex-col justify-center transition-transform hover:-translate-y-1 ${c.border}`}>
               <div className="flex justify-between items-start mb-2 mt-1">
@@ -163,7 +162,7 @@ export default function MentorDashboard() {
             </div>
             <div className="overflow-auto flex-1">
               {highRiskStudents.length === 0 ? (
-                <div className="p-8 text-center text-sm text-gray-500">All students are performing well. No critical cases.</div>
+                <div className="p-8 text-center text-sm text-gray-500">All students are performing well. No high-risk cases.</div>
               ) : (
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50/50 border-b border-gray-100">

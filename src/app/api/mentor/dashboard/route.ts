@@ -40,12 +40,11 @@ export async function GET(request: NextRequest) {
 
     const riskMap = new Map(riskScores.map((r) => [r.studentId.toString(), r]));
 
-    let low = 0, medium = 0, high = 0, critical = 0;
+    let low = 0, medium = 0, high = 0;
     for (const r of riskScores) {
       if (r.riskLevel === "low") low++;
       else if (r.riskLevel === "medium") medium++;
-      else if (r.riskLevel === "high") high++;
-      else critical++;
+      else high++;
     }
 
     // Recent alerts
@@ -82,7 +81,7 @@ export async function GET(request: NextRequest) {
         mentor: { name: mentor.fullName, department: mentor.department, email: mentor.email },
         summary: {
           totalStudents: students.length,
-          low, medium, high, critical,
+          low, medium, high,
           unreadAlerts,
         },
         students: studentList.sort((a, b) => b.riskScore - a.riskScore),

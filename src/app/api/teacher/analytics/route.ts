@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           activeSubjectId: null,
           assessments: baseData.assessments,
           summary: null,
-          riskDistribution: { Low: 0, Medium: 0, High: 0, Critical: 0 },
+          riskDistribution: { Low: 0, Medium: 0, High: 0 },
           assignmentSubmissionBreakdown: { onTime: 0, late: 0, notSubmitted: 0 },
           averagesByAssessment: [],
           histogram: buildHistogramBins(),
@@ -136,7 +136,6 @@ export async function GET(request: NextRequest) {
       Low: 0,
       Medium: 0,
       High: 0,
-      Critical: 0,
     };
 
     for (const entry of studentPercentages) {

@@ -219,7 +219,7 @@ export async function POST() {
       const score = Math.max(0, Math.min(100, Math.round(baseScore)));
 
       const riskLevel =
-        score <= 25 ? "low" : score <= 50 ? "medium" : score <= 75 ? "high" : "critical";
+        score <= 25 ? "low" : score <= 50 ? "medium" : "high";
 
       riskHistoryEntries.push({
         studentId: student._id,

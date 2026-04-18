@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export type RiskLevel = "low" | "medium" | "high" | "critical";
+export type RiskLevel = "low" | "medium" | "high";
 
 export interface IRiskFactor {
   factor: string;
@@ -41,7 +41,7 @@ const RiskScoreSchema: Schema<IRiskScore> = new Schema(
     score: { type: Number, required: true, min: 0, max: 100 },
     riskLevel: {
       type: String,
-      enum: ["low", "medium", "high", "critical"],
+      enum: ["low", "medium", "high"],
       required: true,
     },
     factors: [RiskFactorSchema],

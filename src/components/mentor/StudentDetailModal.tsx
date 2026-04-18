@@ -36,7 +36,6 @@ const RISK_CFG: Record<string, { bg: string; text: string }> = {
   low: { bg: 'bg-green-50 border-green-200', text: 'text-green-700' },
   medium: { bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700' },
   high: { bg: 'bg-orange-50 border-orange-200', text: 'text-orange-700' },
-  critical: { bg: 'bg-red-50 border-red-200', text: 'text-red-700' },
 };
 
 function formatDate(d: string) { return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }

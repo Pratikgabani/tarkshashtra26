@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
       Low: 0,
       Medium: 0,
       High: 0,
-      Critical: 0,
     };
 
     for (const student of baseData.students) {

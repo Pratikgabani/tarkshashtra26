@@ -1,16 +1,15 @@
 import Link from "next/link";
 
 // ─── Risk Badge ──────────────────────────────────────────────────────────────
-function RiskBadge({ level }: { level: "Low" | "Medium" | "High" | "Critical" }) {
+function RiskBadge({ level }: { level: "Low" | "Medium" | "High" }) {
   const styles = {
     Low:      "bg-green-50 text-green-700 border border-green-200",
     Medium:   "bg-yellow-50 text-yellow-700 border border-yellow-200",
     High:     "bg-orange-50 text-orange-700 border border-orange-200",
-    Critical: "bg-red-50 text-red-700 border border-red-200",
   };
   const dots = {
     Low: "bg-green-500", Medium: "bg-yellow-500",
-    High: "bg-orange-500", Critical: "bg-red-500",
+    High: "bg-orange-500",
   };
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold ${styles[level]}`}>
@@ -23,11 +22,11 @@ function RiskBadge({ level }: { level: "Low" | "Medium" | "High" | "Critical" })
 // ─── Hero Mock Dashboard ──────────────────────────────────────────────────────
 function MockDashboard() {
   const students = [
-    { name: "Arjun Mehta",    id: "CE2301", score: 82, level: "Critical" as const, attendance: "48%", pending: 4 },
+    { name: "Arjun Mehta",    id: "CE2301", score: 82, level: "High" as const, attendance: "48%", pending: 4 },
     { name: "Priya Sharma",   id: "CE2304", score: 67, level: "High"     as const, attendance: "61%", pending: 3 },
     { name: "Rohan Desai",    id: "CE2309", score: 44, level: "Medium"   as const, attendance: "72%", pending: 1 },
     { name: "Sneha Patel",    id: "CE2315", score: 18, level: "Low"      as const, attendance: "88%", pending: 0 },
-    { name: "Amit Joshi",     id: "CE2321", score: 76, level: "Critical" as const, attendance: "52%", pending: 5 },
+    { name: "Amit Joshi",     id: "CE2321", score: 76, level: "High" as const, attendance: "52%", pending: 5 },
   ];
 
   return (
@@ -53,7 +52,7 @@ function MockDashboard() {
         {[
           { label: "Total Mentees", value: "32", color: "text-gray-800" },
           { label: "At Risk",       value: "14", color: "text-orange-600" },
-          { label: "Critical",      value: "5",  color: "text-red-600" },
+          { label: "High Risk",     value: "5",  color: "text-red-600" },
           { label: "Interventions", value: "3",  color: "text-blue-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white px-3 py-2.5">
@@ -209,7 +208,7 @@ export default function LandingPage() {
                   </svg>
                 </span>
                 <div>
-                  <p className="text-xs font-semibold text-gray-800">Critical Alert</p>
+                    <p className="text-xs font-semibold text-gray-800">High-Risk Alert</p>
                   <p className="text-xs text-gray-500 mt-0.5">Arjun Mehta — Risk score crossed 76. Immediate intervention required.</p>
                 </div>
               </div>
@@ -474,7 +473,7 @@ export default function LandingPage() {
               { value: "3–4 wks", label: "Earlier identification of struggling students", icon: "⏰" },
               { value: "↓ 40%",   label: "Reduction in undetected at-risk cases",         icon: "📉" },
               { value: "100%",    label: "Intervention actions tracked and auditable",      icon: "✅" },
-              { value: "2×",      label: "Faster faculty response to critical risk",        icon: "⚡" },
+              { value: "2×",      label: "Faster faculty response to high-risk cases",      icon: "⚡" },
             ].map((s) => (
               <div key={s.label} className="bg-[#1E293B] px-6 py-8">
                 <div className="text-2xl mb-2">{s.icon}</div>
