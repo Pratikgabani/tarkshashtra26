@@ -62,6 +62,7 @@ export default function CoordinatorStudents() {
               placeholder="Search by student name or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              suppressHydrationWarning
               className="block w-full pl-10 pr-3 py-2 border border-[#E5E7EB] rounded-lg text-sm bg-[#F9FAFB] text-[#111827] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-shadow outline-none"
             />
           </div>
@@ -74,6 +75,7 @@ export default function CoordinatorStudents() {
             <select
               value={filterDept}
               onChange={(e) => setFilterDept(e.target.value)}
+              suppressHydrationWarning
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Departments</option>
@@ -82,6 +84,7 @@ export default function CoordinatorStudents() {
             <select
               value={filterClass}
               onChange={(e) => setFilterClass(e.target.value)}
+              suppressHydrationWarning
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Classes</option>
@@ -90,6 +93,7 @@ export default function CoordinatorStudents() {
             <select
               value={filterRisk}
               onChange={(e) => setFilterRisk(e.target.value)}
+              suppressHydrationWarning
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Risks</option>

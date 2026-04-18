@@ -76,12 +76,37 @@ export function calculateRisk(attendance: number, marks: number, assignmentsRate
 export const DEPARTMENTS: Department[] = ['Computer Eng.', 'Mechanical Eng.', 'Civil Eng.', 'Electrical Eng.'];
 export const CLASSES = ['CE-A', 'CE-B', 'ME-A', 'EE-A', 'CV-A'];
 
+function seededHash(seed: number): number {
+  let x = seed >>> 0;
+  x = (x ^ 61) ^ (x >>> 16);
+  x = x + (x << 3);
+  x = x ^ (x >>> 4);
+  x = Math.imul(x, 0x27d4eb2d);
+  return (x ^ (x >>> 15)) >>> 0;
+}
+
+function seededInt(seed: number, min: number, max: number): number {
+  const range = max - min + 1;
+  return min + (seededHash(seed) % range);
+}
+
+function seededChance(seed: number, percent: number): boolean {
+  return (seededHash(seed) % 100) < percent;
+}
+
 export const MOCK_STUDENTS: StudentRecord[] = [
   ...Array(150).fill(null).map((_, i) => {
-    const isAtRisk = Math.random() > 0.7; // ~30% at risk globally
-    const attendance = isAtRisk ? 40 + Math.floor(Math.random() * 40) : 75 + Math.floor(Math.random() * 25);
-    const marks = isAtRisk ? 30 + Math.floor(Math.random() * 30) : 60 + Math.floor(Math.random() * 40);
-    const completed = isAtRisk ? Math.floor(Math.random() * 5) : 8 + Math.floor(Math.random() * 3);
+    const baseSeed = i + 1;
+    const isAtRisk = seededChance(baseSeed, 30); // ~30% at risk globally
+    const attendance = isAtRisk
+      ? seededInt(baseSeed + 1000, 40, 79)
+      : seededInt(baseSeed + 1000, 75, 99);
+    const marks = isAtRisk
+      ? seededInt(baseSeed + 2000, 30, 59)
+      : seededInt(baseSeed + 2000, 60, 99);
+    const completed = isAtRisk
+      ? seededInt(baseSeed + 3000, 0, 4)
+      : seededInt(baseSeed + 3000, 8, 10);
     const rate = Math.round((completed / 10) * 100);
     const risk = calculateRisk(attendance, marks, rate);
 
