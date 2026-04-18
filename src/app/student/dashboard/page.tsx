@@ -405,7 +405,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-bold text-gray-900 leading-tight">{pa.title}</h4>
-                      <p className="text-xs font-semibold text-gray-500 mt-1">{pa.subject} • Max {pa.maxMarks} marks</p>
+                      <p className="text-xs font-semibold text-gray-500 mt-1">{(pa as { subject?: string }).subject ?? 'Subject'} • Max {pa.maxMarks} marks</p>
                     </div>
                     <button className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
                       Submit
