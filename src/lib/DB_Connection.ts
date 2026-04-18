@@ -25,7 +25,7 @@ const connectDB = async (): Promise<void> => {
     } catch (error) {
         
         console.log("Error connecting to database", error)
-        process.exit(1)
+        throw error
 
     }
 

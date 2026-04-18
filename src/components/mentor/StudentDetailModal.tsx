@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
   BarChart, Bar, Cell,
@@ -53,6 +53,7 @@ function getUser() {
 export default function StudentDetailModal({ studentId, onClose }: { studentId: string; onClose: () => void }) {
   const [data, setData] = useState<StudentDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
   const [tab, setTab] = useState<'overview' | 'attendance' | 'marks' | 'assignments' | 'actions'>('overview');
 
   // Action form
@@ -65,18 +66,36 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
   const [remarkText, setRemarkText] = useState('');
   const [remarkFollowUp, setRemarkFollowUp] = useState('');
 
-  const fetchDetail = useCallback(async () => {
-    const user = getUser();
-    if (!user) return;
-    try {
-      const res = await fetch(`/api/mentor/students/${studentId}?mentorId=${user.id}`);
-      const json = await res.json();
-      if (res.ok) setData(json.data);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  }, [studentId]);
+  const refreshDetail = () => {
+    setLoading(true);
+    setReloadToken((token) => token + 1);
+  };
 
-  useEffect(() => { fetchDetail(); }, [fetchDetail]);
+  useEffect(() => {
+    const user = getUser();
+    if (!user) {
+      window.location.href = '/login';
+      return;
+    }
+
+    let isActive = true;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/mentor/students/${studentId}?mentorId=${user.id}`);
+        const json = await res.json();
+        if (res.ok && isActive) setData(json.data);
+      } catch {
+        /* ignore */
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [studentId, reloadToken]);
 
   async function handleCreateAction() {
     const user = getUser();
@@ -90,7 +109,7 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
       });
       setShowActionForm(false);
       setActionForm({ actionType: 'counseling', description: '', date: new Date().toISOString().split('T')[0] });
-      fetchDetail();
+      refreshDetail();
     } catch { /* ignore */ }
     finally { setSaving(false); }
   }
@@ -107,18 +126,23 @@ export default function StudentDetailModal({ studentId, onClose }: { studentId: 
       setRemarkActionId(null);
       setRemarkText('');
       setRemarkFollowUp('');
-      fetchDetail();
+      refreshDetail();
     } catch { /* ignore */ }
   }
 
   async function handleUpdateActionStatus(actionId: string, status: string) {
+    const user = getUser();
+    if (!user) {
+      window.location.assign('/login');
+      return;
+    }
     try {
       await fetch('/api/mentor/actions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId, status }),
+        body: JSON.stringify({ actionId, mentorId: user.id, status }),
       });
-      fetchDetail();
+      refreshDetail();
     } catch { /* ignore */ }
   }
 

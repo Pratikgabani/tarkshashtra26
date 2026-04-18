@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 
 interface AlertItem {
   id: string; studentId: string; studentName: string; type: string; priority: string;
@@ -20,30 +20,50 @@ function priorityStyle(p: string) {
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
   const [filter, setFilter] = useState<'all' | 'unread' | 'acknowledged'>('all');
 
-  const fetchAlerts = useCallback(async () => {
+  const refreshAlerts = () => {
+    setLoading(true);
+    setReloadToken((token) => token + 1);
+  };
+
+  useEffect(() => {
     const user = getUser();
     if (!user) { window.location.href = '/login'; return; }
-    try {
-      const res = await fetch(`/api/mentor/alerts?mentorId=${user.id}`);
-      const json = await res.json();
-      if (res.ok) setAlerts(json.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  }, []);
 
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+    let isActive = true;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/mentor/alerts?mentorId=${user.id}`);
+        const json = await res.json();
+        if (res.ok && isActive) setAlerts(json.data || []);
+      } catch {
+        /* ignore */
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [reloadToken]);
 
   async function acknowledge(id: string) {
-    await fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id, status: 'acknowledged' }) });
-    fetchAlerts();
+    const user = getUser();
+    if (!user) { window.location.assign('/login'); return; }
+    await fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id, mentorId: user.id, status: 'acknowledged' }) });
+    refreshAlerts();
   }
 
   async function acknowledgeAll() {
+    const user = getUser();
+    if (!user) { window.location.assign('/login'); return; }
     const unread = alerts.filter(a => a.status === 'unread');
-    await Promise.all(unread.map(a => fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: a.id, status: 'acknowledged' }) })));
-    fetchAlerts();
+    await Promise.all(unread.map(a => fetch('/api/mentor/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: a.id, mentorId: user.id, status: 'acknowledged' }) })));
+    refreshAlerts();
   }
 
   const filtered = filter === 'all' ? alerts : alerts.filter(a => a.status === filter);

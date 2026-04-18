@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
-import Alert from "@/src/models/alert";
+import Alert, { type AlertStatus } from "@/src/models/alert";
 import User from "@/src/models/user";
+
+const VALID_ALERT_STATUSES: AlertStatus[] = ["unread", "acknowledged", "actioned"];
 
 /**
  * GET /api/mentor/alerts?mentorId=xxx
@@ -41,17 +43,38 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/mentor/alerts — Acknowledge alert
- * Body: { alertId, status }
+ * Body: { alertId, mentorId, status }
  */
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
-    const body = await request.json();
-    const { alertId, status } = body;
+    const body = (await request.json()) as {
+      alertId?: string;
+      mentorId?: string;
+      status?: AlertStatus;
+    };
+    const { alertId, mentorId, status } = body;
 
-    if (!alertId || !status) return NextResponse.json({ success: false, message: "alertId and status required" }, { status: 400 });
+    if (!alertId || !mentorId || !status) {
+      return NextResponse.json({ success: false, message: "alertId, mentorId and status required" }, { status: 400 });
+    }
+    if (!VALID_ALERT_STATUSES.includes(status)) {
+      return NextResponse.json({ success: false, message: "Invalid alert status" }, { status: 400 });
+    }
 
-    await Alert.findByIdAndUpdate(alertId, { status });
+    const alert = await Alert.findById(alertId).select("mentorId").lean();
+    if (!alert) {
+      return NextResponse.json({ success: false, message: "Alert not found" }, { status: 404 });
+    }
+    if (!alert.mentorId || alert.mentorId.toString() !== mentorId) {
+      return NextResponse.json({ success: false, message: "Not authorized to update this alert" }, { status: 403 });
+    }
+
+    const update: { status: AlertStatus; readAt?: Date } = { status };
+    if (status === "acknowledged") update.readAt = new Date();
+    if (status === "unread") update.readAt = undefined;
+
+    await Alert.findByIdAndUpdate(alertId, update, { runValidators: true });
     return NextResponse.json({ success: true, message: "Alert updated" });
   } catch (error) {
     console.error("Alerts PUT error:", error);

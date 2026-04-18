@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MOCK_USERS, UserRecord, UserRole } from '@/src/lib/coordinatorData';
+import { MOCK_USERS, type Department, UserRecord, UserRole } from '@/src/lib/coordinatorData';
 import { Pencil, Trash2, Plus, Users as UsersIcon, X } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -26,7 +26,7 @@ export default function UserManagement() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('Student');
-  const [department, setDepartment] = useState<any>('Computer Eng.');
+  const [department, setDepartment] = useState<Department>('Computer Eng.');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
 
   const filteredUsers = filterRole === 'All' ? users : users.filter(u => u.role === filterRole);
@@ -191,7 +191,7 @@ export default function UserManagement() {
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-1.5">Department</label>
-                    <select value={department} onChange={e => setDepartment(e.target.value)} className="w-full border border-[#E5E7EB] rounded-lg text-sm text-[#111827] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2563EB]">
+                    <select value={department} onChange={e => setDepartment(e.target.value as Department)} className="w-full border border-[#E5E7EB] rounded-lg text-sm text-[#111827] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2563EB]">
                       <option value="Computer Eng.">Computer Eng.</option>
                       <option value="Mechanical Eng.">Mechanical Eng.</option>
                       <option value="Civil Eng.">Civil Eng.</option>

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { 
   RISK_SCORE_DATA, 
@@ -14,7 +13,7 @@ import {
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
-import { ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText } from 'lucide-react';
+import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText } from 'lucide-react';
 
 // ─── Reusable Topbar ────────────────────────────────────────────────────────
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -33,7 +32,60 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
     </div>
   );
 }
-import { Bell } from 'lucide-react';
+
+interface RiskHistoryItem {
+  week: string;
+  score: number;
+  intervention?: boolean;
+}
+
+interface ChartTooltipEntry {
+  color?: string;
+  value: number;
+  payload: RiskHistoryItem;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: ChartTooltipEntry[];
+  label?: string;
+}
+
+interface DotRenderProps {
+  cx?: number;
+  cy?: number;
+  payload?: RiskHistoryItem;
+}
+
+function CustomChartTooltip({ active, payload, label }: ChartTooltipProps) {
+  if (active && payload && payload.length > 0) {
+    const point = payload[0];
+    return (
+      <div className="bg-gray-900 border border-gray-800 text-white p-3 rounded-lg shadow-xl">
+        <p className="text-xs font-bold mb-1">{label}</p>
+        <p className="text-sm font-semibold flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: point.color || '#3B82F6' }} />
+          Score: {point.value}
+        </p>
+        {point.payload.intervention && (
+          <p className="text-[10px] text-blue-300 mt-2 bg-blue-900/30 px-2 py-1 rounded border border-blue-800">
+            Mentor Intervention
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function renderDashboardDot({ cx, cy, payload }: DotRenderProps) {
+  if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+  if (payload?.intervention) {
+    return <circle cx={cx} cy={cy} r={6} fill="#EF4444" stroke="#fff" strokeWidth={2} />;
+  }
+  return <circle cx={cx} cy={cy} r={4} fill="#3B82F6" stroke="#fff" strokeWidth={2} />;
+}
 
 // ─── Risk Badge ─────────────────────────────────────────────────────────────
 function RiskBadge({ level }: { level: RiskLevel }) {
@@ -56,32 +108,10 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function StudentDashboard() {
-  const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
-
   // SVG Donut metrics
   const score = RISK_SCORE_DATA.score;
   const strokeDasharray = `${(score / 100) * 283} 283`;
   const strokeColor = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : score >= 40 ? '#f97316' : '#ef4444';
-
-  const CustomChartTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-gray-900 border border-gray-800 text-white p-3 rounded-lg shadow-xl">
-          <p className="text-xs font-bold mb-1">{label}</p>
-          <p className="text-sm font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color }} />
-            Score: {payload[0].value}
-          </p>
-          {payload[0].payload.intervention && (
-            <p className="text-[10px] text-blue-300 mt-2 bg-blue-900/30 px-2 py-1 rounded border border-blue-800">
-              Mentor Intervention
-            </p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="flex flex-col flex-1">
@@ -216,8 +246,6 @@ export default function StudentDashboard() {
                   href={`/student/subjects?id=${s.id}`} 
                   key={s.id}
                   className="block bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group"
-                  onMouseEnter={() => setHoveredSubject(s.id)}
-                  onMouseLeave={() => setHoveredSubject(null)}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -255,7 +283,7 @@ export default function StudentDashboard() {
             </div>
             
             <div className="flex-1 w-full min-h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={RISK_HISTORY} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
@@ -267,15 +295,7 @@ export default function StudentDashboard() {
                     dataKey="score" 
                     stroke="#3B82F6" 
                     strokeWidth={4}
-                    dot={(props: any) => {
-                      const { cx, cy, payload } = props;
-                      if(payload.intervention) {
-                        return (
-                          <circle cx={cx} cy={cy} r={6} fill="#EF4444" stroke="#fff" strokeWidth={2} />
-                        )
-                      }
-                      return <circle cx={cx} cy={cy} r={4} fill="#3B82F6" stroke="#fff" strokeWidth={2} />;
-                    }}
+                    dot={renderDashboardDot}
                     activeDot={{ r: 8, strokeWidth: 0, fill: '#2563EB' }}
                   />
                 </LineChart>

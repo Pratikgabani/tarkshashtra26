@@ -186,14 +186,7 @@ export default function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 11, border: '1px solid #E5E7EB', borderRadius: 6 }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={((value: number, _name: string, props: { payload?: AssessmentBar }) => {
-                    const max = props.payload?.max ?? 0;
-                    return [`${value} / ${max} (${max > 0 ? Math.round((value / max) * 100) : 0}%)`, 'Class Avg'];
-                  }) as any}
-                />
+                <Tooltip contentStyle={{ fontSize: 11, border: '1px solid #E5E7EB', borderRadius: 6 }} />
                 <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
                   {avgPerAssessment.map((entry, i) => (
                     <Cell key={i} fill={entry.pct < 40 ? '#DC2626' : entry.pct < 60 ? '#EA580C' : '#2563EB'} />
@@ -233,11 +226,7 @@ export default function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
               <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ fontSize: 11, border: '1px solid #E5E7EB', borderRadius: 6 }}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={((value: number) => [value, 'Students']) as any}
-              />
+              <Tooltip contentStyle={{ fontSize: 11, border: '1px solid #E5E7EB', borderRadius: 6 }} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {bins.map((b, i) => (
                   <Cell key={i} fill={b.low < 40 ? '#DC2626' : b.low < 60 ? '#EA580C' : b.low < 75 ? '#CA8A04' : '#16A34A'} />

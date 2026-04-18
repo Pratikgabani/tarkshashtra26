@@ -18,24 +18,6 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: SubmissionStatus }) {
-  const cfg: Record<SubmissionStatus, string> = {
-    'On Time':       'bg-green-50 text-green-700 border-green-200',
-    'Late':          'bg-yellow-50 text-yellow-700 border-yellow-200',
-    'Not Submitted': 'bg-red-50 text-red-700 border-red-200',
-  };
-  const dots: Record<SubmissionStatus, string> = {
-    'On Time': 'bg-green-500', 'Late': 'bg-yellow-500', 'Not Submitted': 'bg-red-500',
-  };
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-semibold ${cfg[status]}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dots[status]}`} />
-      {status}
-    </span>
-  );
-}
-
 // ─── Flag Modal ───────────────────────────────────────────────────────────────
 function FlagModal({
   studentName, onClose, onSubmit,

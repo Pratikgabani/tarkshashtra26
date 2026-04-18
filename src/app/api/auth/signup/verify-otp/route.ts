@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import connectDB from "@/src/lib/DB_Connection";
 import User from "@/src/models/user";
 import { hashOtp } from "@/src/lib/otp";
@@ -59,7 +60,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isOtpValid = hashOtp(otp) === user.signupOtpHash;
+    const providedOtpHash = Buffer.from(hashOtp(otp), "utf8");
+    const storedOtpHash = Buffer.from(user.signupOtpHash, "utf8");
+    const isOtpValid =
+      providedOtpHash.length === storedOtpHash.length &&
+      timingSafeEqual(providedOtpHash, storedOtpHash);
 
     if (!isOtpValid) {
       return NextResponse.json(

@@ -79,18 +79,6 @@ export default function RiskChart({ history }: RiskChartProps) {
             fontSize: "12px",
             boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
           }}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={((value: number) => {
-            const level = value <= 25 ? "Low" : value <= 50 ? "Medium" : value <= 75 ? "High" : "Critical";
-            return [`${value} (${level})`, "Risk Score"];
-          }) as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          labelFormatter={((label: string, payload: any) => {
-            if (payload && payload.length > 0) {
-              return payload[0].payload.date;
-            }
-            return label;
-          }) as any}
         />
 
         <Area

@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { RISK_HISTORY } from '@/src/lib/studentData';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart
 } from 'recharts';
-import { Calendar, Filter, TrendingUp, TrendingDown, Target } from 'lucide-react';
+import { Filter, TrendingUp, TrendingDown, Target } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -18,28 +18,62 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
+interface RiskPoint {
+  score: number;
+  date: string;
+  intervention?: boolean;
+}
+
+interface ChartTooltipEntry {
+  value: number;
+  payload: RiskPoint;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: ChartTooltipEntry[];
+  label?: string;
+}
+
+interface DotRenderProps {
+  cx?: number;
+  cy?: number;
+  payload?: RiskPoint;
+}
+
+function CustomChartTooltip({ active, payload, label }: ChartTooltipProps) {
+  if (active && payload && payload.length > 0) {
+    return (
+      <div className="bg-gray-900 border border-gray-800 text-white p-3 rounded-lg shadow-xl min-w-[150px]">
+        <p className="text-xs font-bold mb-1 text-gray-400">{label}</p>
+        <p className="text-lg font-black flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+          {payload[0].value} <span className="text-xs font-medium text-gray-400">/ 100</span>
+        </p>
+        {payload[0].payload.intervention && (
+          <div className="mt-3 bg-red-500/20 border border-red-500/30 rounded p-2 text-[10px] font-bold text-red-200 uppercase tracking-widest text-center">
+            Mentor Intervention
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function renderRiskDot({ cx, cy, payload }: DotRenderProps) {
+  if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+  if (payload?.intervention) {
+    return (
+      <circle cx={cx} cy={cy} r={7} fill="#EF4444" stroke="#fff" strokeWidth={3} className="animate-pulse" />
+    );
+  }
+  return <circle cx={cx} cy={cy} r={5} fill="#3B82F6" stroke="#fff" strokeWidth={2} />;
+}
+
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState('8weeks');
-
-  const CustomChartTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-gray-900 border border-gray-800 text-white p-3 rounded-lg shadow-xl min-w-[150px]">
-          <p className="text-xs font-bold mb-1 text-gray-400">{label}</p>
-          <p className="text-lg font-black flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            {payload[0].value} <span className="text-xs font-medium text-gray-400">/ 100</span>
-          </p>
-          {payload[0].payload.intervention && (
-            <div className="mt-3 bg-red-500/20 border border-red-500/30 rounded p-2 text-[10px] font-bold text-red-200 uppercase tracking-widest text-center">
-              Mentor Intervention
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#F8FAFC]">
@@ -121,7 +155,7 @@ export default function AnalyticsPage() {
           </div>
           
           <div className="w-full h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={400}>
               <AreaChart data={RISK_HISTORY} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
@@ -142,15 +176,7 @@ export default function AnalyticsPage() {
                   fillOpacity={1}
                   fill="url(#colorScore)"
                   activeDot={{ r: 8, strokeWidth: 0, fill: '#1D4ED8' }}
-                  dot={(props: any) => {
-                    const { cx, cy, payload } = props;
-                    if(payload.intervention) {
-                      return (
-                        <circle cx={cx} cy={cy} r={7} fill="#EF4444" stroke="#fff" strokeWidth={3} className="animate-pulse" />
-                      )
-                    }
-                    return <circle cx={cx} cy={cy} r={5} fill="#3B82F6" stroke="#fff" strokeWidth={2} />;
-                  }}
+                  dot={renderRiskDot}
                 />
               </AreaChart>
             </ResponsiveContainer>

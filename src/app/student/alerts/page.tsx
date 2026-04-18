@@ -63,7 +63,7 @@ export default function AlertsPage() {
             <div className="text-center py-20">
               <CheckCircle2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-sm font-bold text-gray-900">All Caught Up</h3>
-              <p className="text-xs font-medium text-gray-500 mt-1">You don't have any {filter.toLowerCase()} notifications.</p>
+              <p className="text-xs font-medium text-gray-500 mt-1">You do not have any {filter.toLowerCase()} notifications.</p>
             </div>
           ) : (
             filteredAlerts.map(alert => {

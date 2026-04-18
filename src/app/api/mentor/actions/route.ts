@@ -4,6 +4,9 @@ import MentorAction from "@/src/models/mentorAction";
 import MentorRemark from "@/src/models/mentorRemark";
 import User from "@/src/models/user";
 
+const VALID_ACTION_STATUSES = ["scheduled", "completed", "cancelled"] as const;
+type ActionStatus = (typeof VALID_ACTION_STATUSES)[number];
+
 /**
  * GET /api/mentor/actions?mentorId=xxx&studentId=xxx (optional)
  */
@@ -69,6 +72,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "All fields required" }, { status: 400 });
     }
 
+    const actionDate = new Date(date);
+    if (Number.isNaN(actionDate.getTime())) {
+      return NextResponse.json({ success: false, message: "Invalid action date" }, { status: 400 });
+    }
+
     const student = await User.findById(studentId).lean();
     if (!student || student.assignedMentorId !== mentorId) {
       return NextResponse.json({ success: false, message: "Student not assigned to you" }, { status: 403 });
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
       studentId,
       actionType,
       description: description.trim(),
-      date: new Date(date),
+      date: actionDate,
       status: "scheduled",
     });
 
@@ -96,21 +104,43 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/mentor/actions — Update action status/outcome
- * Body: { actionId, status?, outcome? }
+ * Body: { actionId, mentorId, status?, outcome? }
  */
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
-    const body = await request.json();
-    const { actionId, status, outcome } = body;
+    const body = (await request.json()) as {
+      actionId?: string;
+      mentorId?: string;
+      status?: ActionStatus;
+      outcome?: string;
+    };
+    const { actionId, mentorId, status, outcome } = body;
 
-    if (!actionId) return NextResponse.json({ success: false, message: "actionId required" }, { status: 400 });
+    if (!actionId || !mentorId) {
+      return NextResponse.json({ success: false, message: "actionId and mentorId required" }, { status: 400 });
+    }
+
+    if (status && !VALID_ACTION_STATUSES.includes(status)) {
+      return NextResponse.json({ success: false, message: "Invalid action status" }, { status: 400 });
+    }
+
+    const action = await MentorAction.findById(actionId).select("mentorId").lean();
+    if (!action) {
+      return NextResponse.json({ success: false, message: "Action not found" }, { status: 404 });
+    }
+    if (action.mentorId.toString() !== mentorId) {
+      return NextResponse.json({ success: false, message: "Not authorized to update this action" }, { status: 403 });
+    }
 
     const update: Record<string, unknown> = {};
     if (status) update.status = status;
-    if (outcome) update.outcome = outcome;
+    if (typeof outcome === "string") update.outcome = outcome.trim();
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ success: false, message: "Nothing to update" }, { status: 400 });
+    }
 
-    await MentorAction.findByIdAndUpdate(actionId, update);
+    await MentorAction.findByIdAndUpdate(actionId, update, { runValidators: true });
 
     return NextResponse.json({ success: true, message: "Action updated" });
   } catch (error) {

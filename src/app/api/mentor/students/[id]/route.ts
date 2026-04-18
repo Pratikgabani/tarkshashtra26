@@ -3,11 +3,16 @@ import connectDB from "@/src/lib/DB_Connection";
 import User from "@/src/models/user";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
-import Assignment from "@/src/models/assignment";
 import StudentAssignment from "@/src/models/studentAssignment";
 import RiskScore from "@/src/models/riskScore";
 import MentorAction from "@/src/models/mentorAction";
 import MentorRemark from "@/src/models/mentorRemark";
+
+interface PopulatedAssignmentRef {
+  title?: string;
+  maxMarks?: number;
+  dueDate?: Date;
+}
 
 /**
  * GET /api/mentor/students/[id]?mentorId=xxx
@@ -77,13 +82,12 @@ export async function GET(
       : 0;
 
     // Assignments
-    const allAssignments = await Assignment.find({}).lean();
     const studentSubs = await StudentAssignment.find({ studentId: student._id })
       .populate("assignmentId")
       .lean();
 
     const assignmentData = studentSubs.map((sa) => {
-      const a = sa.assignmentId as unknown as typeof allAssignments[0];
+      const a = sa.assignmentId as unknown as PopulatedAssignmentRef;
       return {
         title: a?.title || "",
         status: sa.status,

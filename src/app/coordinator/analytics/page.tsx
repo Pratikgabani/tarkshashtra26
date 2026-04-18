@@ -47,11 +47,12 @@ export default function CoordinatorAnalytics() {
   ];
 
   // Dummy Class stats
-  const classStats = CLASSES.map(c => {
+  const classStats = CLASSES.map((c, index) => {
+    const seed = c.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
     return {
       class: c,
-      avgScore: 50 + Math.floor(Math.random() * 30),
-      atRiskCount: Math.floor(Math.random() * 15)
+      avgScore: 50 + ((seed * 13 + index * 7) % 30),
+      atRiskCount: (seed + index * 5) % 15
     }
   });
 
@@ -112,7 +113,7 @@ export default function CoordinatorAnalytics() {
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Class-wise Analysis</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">At-Risk students by class block</p>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={classStats} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
                   <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} />

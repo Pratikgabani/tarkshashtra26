@@ -57,9 +57,6 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 export default function TeacherDashboard() {
   const flags = INITIAL_FLAGS;
 
-  // Compute summary stats across all subjects
-  const allStudentIds = STUDENTS.map(s => s.id);
-
   // Students below threshold (< 40%) in at least one subject
   const belowThresholdIds = new Set<string>();
   STUDENTS.forEach(s => {
@@ -88,28 +85,6 @@ export default function TeacherDashboard() {
     });
   });
   const avgMarks = Math.round(totalPct / (STUDENTS.length * SUBJECTS.length));
-
-  // Per-subject stats
-  const subjectStats = SUBJECTS.map(sub => {
-    const avgPct = Math.round(
-      STUDENTS.reduce((acc, s) => acc + computeSubjectPercentage(INITIAL_MARKS, s.id, sub.id), 0) / STUDENTS.length
-    );
-    const below = STUDENTS.filter(s => computeSubjectPercentage(INITIAL_MARKS, s.id, sub.id) < 40).length;
-
-    // Submission rate for this subject's assignments
-    const subAssignments = ASSIGNMENTS.filter(a => a.subjectId === sub.id);
-    let subSubmitted = 0;
-    subAssignments.forEach(a => {
-      STUDENTS.forEach(s => {
-        if (INITIAL_SUBMISSIONS[a.id]?.[s.id]?.status !== 'Not Submitted') subSubmitted++;
-      });
-    });
-    const subSubRate = subAssignments.length > 0
-      ? Math.round((subSubmitted / (subAssignments.length * STUDENTS.length)) * 100)
-      : 0;
-
-    return { ...sub, avgPct, below, subSubRate };
-  });
 
   // Risk distribution
   const riskCounts = { Low: 0, Medium: 0, High: 0, Critical: 0 };

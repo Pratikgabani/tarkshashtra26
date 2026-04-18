@@ -28,7 +28,7 @@ export default function InterventionMonitoring() {
           </div>
           <div>
             <h2 className="text-2xl font-black text-[#111827]">{MOCK_INTERVENTIONS.length} Logged Interventions</h2>
-            <p className="text-[13px] font-medium text-[#6B7280] mt-1">Reviewing the "Score Before vs After" effectiveness metrics</p>
+            <p className="text-[13px] font-medium text-[#6B7280] mt-1">Reviewing the &quot;Score Before vs After&quot; effectiveness metrics</p>
           </div>
         </div>
 

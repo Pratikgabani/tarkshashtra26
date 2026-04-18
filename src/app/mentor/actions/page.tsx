@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 
 interface RemarkItem { id: string; text: string; followUpDate: string | null; createdAt: string; }
 interface ActionItem { id: string; studentId: string; studentName: string; actionType: string; description: string; date: string; status: string; outcome: string; remarks: RemarkItem[]; }
@@ -12,37 +12,56 @@ function getUser() { const s = localStorage.getItem('shikshasetu_user'); return 
 export default function ActionsPage() {
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [remarkActionId, setRemarkActionId] = useState<string | null>(null);
   const [remarkText, setRemarkText] = useState('');
   const [remarkFollowUp, setRemarkFollowUp] = useState('');
 
-  const fetchActions = useCallback(async () => {
+  const refreshActions = () => {
+    setLoading(true);
+    setReloadToken((token) => token + 1);
+  };
+
+  useEffect(() => {
     const user = getUser();
     if (!user) { window.location.href = '/login'; return; }
-    try {
-      const res = await fetch(`/api/mentor/actions?mentorId=${user.id}`);
-      const json = await res.json();
-      if (res.ok) setActions(json.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  }, []);
 
-  useEffect(() => { fetchActions(); }, [fetchActions]);
+    let isActive = true;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/mentor/actions?mentorId=${user.id}`);
+        const json = await res.json();
+        if (res.ok && isActive) setActions(json.data || []);
+      } catch {
+        /* ignore */
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [reloadToken]);
 
   async function updateStatus(id: string, status: string) {
-    await fetch('/api/mentor/actions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: id, status }) });
-    fetchActions();
+    const user = getUser();
+    if (!user) { window.location.assign('/login'); return; }
+    await fetch('/api/mentor/actions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: id, mentorId: user.id, status }) });
+    refreshActions();
   }
 
   async function addRemark() {
     const user = getUser();
     if (!user || !remarkText.trim() || !remarkActionId) return;
     const action = actions.find(a => a.id === remarkActionId);
+    if (!action) return;
     await fetch('/api/mentor/remarks', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionId: remarkActionId, mentorId: user.id, studentId: action?.studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }) });
+      body: JSON.stringify({ actionId: remarkActionId, mentorId: user.id, studentId: action.studentId, text: remarkText, followUpDate: remarkFollowUp || undefined }) });
     setRemarkActionId(null); setRemarkText(''); setRemarkFollowUp('');
-    fetchActions();
+    refreshActions();
   }
 
   const filtered = filter === 'all' ? actions : actions.filter(a => a.status === filter);

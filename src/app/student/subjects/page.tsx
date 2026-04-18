@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SUBJECT_PERFORMANCE, SUBJECT_DETAILS } from '@/src/lib/studentData';
-import { BookOpen, GraduationCap, Clock, AlertTriangle, FileText, ChevronRight } from 'lucide-react';
+import { BookOpen, GraduationCap, FileText } from 'lucide-react';
+
+type AssignmentStatus = 'On Time' | 'Late' | 'Missing' | 'Pending';
+
+const STATUS_COLORS: Record<AssignmentStatus, string> = {
+  'On Time': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Late: 'bg-amber-50 text-amber-700 border-amber-200',
+  Missing: 'bg-red-50 text-red-700 border-red-200',
+  Pending: 'bg-gray-50 text-gray-600 border-gray-200',
+};
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -16,7 +25,7 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export default function SubjectsPage() {
+function SubjectsContent() {
   const searchParams = useSearchParams();
   const initialSubject = searchParams?.get('id') || SUBJECT_PERFORMANCE[0].id;
   const [activeSubjectId, setActiveSubjectId] = useState(initialSubject);
@@ -142,12 +151,8 @@ export default function SubjectsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {details.assignments.map((a, i) => {
-                        const statusColors: any = {
-                          'On Time': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                          'Late': 'bg-amber-50 text-amber-700 border-amber-200',
-                          'Missing': 'bg-red-50 text-red-700 border-red-200',
-                          'Pending': 'bg-gray-50 text-gray-600 border-gray-200',
-                        };
+                        const status = a.status as AssignmentStatus;
+                        const statusColor = STATUS_COLORS[status] || STATUS_COLORS.Pending;
                         return (
                           <tr key={i} className="hover:bg-gray-50">
                             <td className="px-4 py-4">
@@ -155,7 +160,7 @@ export default function SubjectsPage() {
                               <p className="text-xs font-medium text-gray-500 mt-0.5" suppressHydrationWarning>Due {new Date(a.dueDate).toLocaleDateString('en-GB')}</p>
                             </td>
                             <td className="px-4 py-4">
-                              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${statusColors[a.status]}`}>
+                              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${statusColor}`}>
                                 {a.status}
                               </span>
                             </td>
@@ -175,5 +180,22 @@ export default function SubjectsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SubjectsFallback() {
+  return (
+    <div className="flex flex-col flex-1 h-full overflow-hidden">
+      <Topbar title="Subject Performance" subtitle="Detailed breakdown of your academic progress by subject" />
+      <div className="flex flex-1 items-center justify-center text-sm font-medium text-gray-500">Loading subject details...</div>
+    </div>
+  );
+}
+
+export default function SubjectsPage() {
+  return (
+    <Suspense fallback={<SubjectsFallback />}>
+      <SubjectsContent />
+    </Suspense>
   );
 }

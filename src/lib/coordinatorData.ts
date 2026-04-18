@@ -42,7 +42,7 @@ export interface UserRecord {
 
 export function calculateRisk(attendance: number, marks: number, assignmentsRate: number) {
   let score = 100;
-  let explanation = [];
+  const explanation: string[] = [];
   
   if (attendance < 75) {
     score -= (75 - attendance) * 1.5;

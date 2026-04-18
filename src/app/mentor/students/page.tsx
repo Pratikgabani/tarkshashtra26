@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, Filter, Layers, LayoutGrid, ChevronRight, LayoutList } from 'lucide-react';
+import { Search, Filter, Layers, ChevronRight } from 'lucide-react';
 
 const StudentDetailModal = dynamic(() => import('@/src/components/mentor/StudentDetailModal'), { ssr: false });
 
@@ -59,7 +59,11 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view');
+  });
 
   useEffect(() => {
     async function load() {
@@ -78,12 +82,6 @@ export default function StudentsPage() {
       setStudents(DUMMY_STUDENTS); setLoading(false);
     }
     load();
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewId = params.get('view');
-    if (viewId) setSelectedStudentId(viewId);
   }, []);
 
   let filtered = students;
@@ -157,7 +155,7 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((s, i) => {
+                  {filtered.map((s) => {
                     const isHigh = s.riskLevel === 'high' || s.riskLevel === 'critical';
                     return (
                       <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isHigh ? 'bg-red-50/20' : 'hover:bg-gray-50/50'}`}>

@@ -15,13 +15,20 @@ export async function GET(request: NextRequest) {
     const riskFilter = request.nextUrl.searchParams.get("risk");
     const search = request.nextUrl.searchParams.get("search");
     const batch = request.nextUrl.searchParams.get("batch");
+    const sanitizedBatch = batch?.trim();
 
     if (!mentorId) return NextResponse.json({ success: false, message: "mentorId required" }, { status: 400 });
+    if (sanitizedBatch && !/^[A-Za-z0-9-]{1,20}$/.test(sanitizedBatch)) {
+      return NextResponse.json({ success: false, message: "Invalid batch filter" }, { status: 400 });
+    }
 
     // Build student query
     const query: Record<string, unknown> = { assignedMentorId: mentorId, role: "student" };
-    if (search) query.fullName = { $regex: search, $options: "i" };
-    if (batch) query.batch = batch;
+    if (search) {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.fullName = { $regex: escapedSearch, $options: "i" };
+    }
+    if (sanitizedBatch) query.batch = sanitizedBatch;
 
     const students = await User.find(query).lean();
     const studentIds = students.map((s) => s._id);

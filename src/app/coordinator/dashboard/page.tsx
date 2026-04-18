@@ -1,6 +1,6 @@
 'use client';
 
-import { getSystemAggregates, MOCK_STUDENTS } from '@/src/lib/coordinatorData';
+import { getSystemAggregates } from '@/src/lib/coordinatorData';
 import { Users, AlertTriangle, Activity, Briefcase } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
@@ -103,7 +103,7 @@ export default function CoordinatorDashboard() {
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Risk Distribution</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">Breakdown of student body health</p>
             <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -132,7 +132,7 @@ export default function CoordinatorDashboard() {
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Department Comparison</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">At-risk vs Total students by department</p>
             <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={deptStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="department" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#6B7280' }} dy={10} />
@@ -158,7 +158,7 @@ export default function CoordinatorDashboard() {
             </button>
           </div>
           <div className="h-[300px]">
-             <ResponsiveContainer width="100%" height="100%">
+             <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#6B7280' }} dy={10} />
