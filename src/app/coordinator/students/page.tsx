@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { MOCK_STUDENTS, DEPARTMENTS, CLASSES, RiskLevel } from '@/src/lib/coordinatorData';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  MOCK_STUDENTS,
+  DEPARTMENTS,
+  CLASSES,
+  type RiskLevel,
+  type StudentRecord,
+} from '@/src/lib/coordinatorData';
 import { Search, Filter } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -34,22 +40,91 @@ export default function CoordinatorStudents() {
   const [filterDept, setFilterDept] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
   const [filterRisk, setFilterRisk] = useState('All');
+  const [students, setStudents] = useState<StudentRecord[]>(MOCK_STUDENTS);
+  const [departments, setDepartments] = useState<string[]>(DEPARTMENTS);
+  const [classes, setClasses] = useState<string[]>(CLASSES);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (searchTerm.trim()) params.set('search', searchTerm.trim());
+        if (filterDept !== 'All') params.set('department', filterDept);
+        if (filterClass !== 'All') params.set('class', filterClass);
+        if (filterRisk !== 'All') params.set('risk', filterRisk.toLowerCase());
+
+        const response = await fetch(`/api/coordinator/students?${params.toString()}`, {
+          cache: 'no-store',
+        });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          const records = Array.isArray(json.data.students) ? json.data.students : [];
+          const normalizedRecords: StudentRecord[] = records.map((record: StudentRecord) => ({
+            ...record,
+            riskLevel: record.riskLevel as RiskLevel,
+          }));
+
+          setStudents(normalizedRecords);
+          setDepartments(
+            Array.isArray(json.data.filters?.departments) && json.data.filters.departments.length > 0
+              ? json.data.filters.departments
+              : DEPARTMENTS
+          );
+          setClasses(
+            Array.isArray(json.data.filters?.classes) && json.data.filters.classes.length > 0
+              ? json.data.filters.classes
+              : CLASSES
+          );
+          setApiError('');
+        } else if (!cancelled) {
+          setApiError(json?.message || 'Unable to fetch live student records. Showing fallback data.');
+        }
+      } catch {
+        if (!cancelled) {
+          setApiError('Unable to fetch live student records. Showing fallback data.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm, filterDept, filterClass, filterRisk]);
 
   const filteredStudents = useMemo(() => {
-    return MOCK_STUDENTS.filter(s => {
+    return students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchDept = filterDept === 'All' || s.department === filterDept;
       const matchClass = filterClass === 'All' || s.classBatch === filterClass;
       const matchRisk = filterRisk === 'All' || s.riskLevel === filterRisk;
       return matchSearch && matchDept && matchClass && matchRisk;
     });
-  }, [searchTerm, filterDept, filterClass, filterRisk]);
+  }, [students, searchTerm, filterDept, filterClass, filterRisk]);
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-hidden">
       <Topbar title="Student Monitoring" subtitle="Search, filter, and review individual student profiles and risk rationales" />
 
       <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-[1600px]">
+        {loading && (
+          <div className="mb-4 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
+            Loading student records...
+          </div>
+        )}
+        {apiError && (
+          <div className="mb-4 bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {apiError}
+          </div>
+        )}
         
         {/* Filters Bar */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-center justify-between shrink-0">
@@ -79,7 +154,7 @@ export default function CoordinatorStudents() {
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Departments</option>
-              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
             <select
               value={filterClass}
@@ -88,7 +163,7 @@ export default function CoordinatorStudents() {
               className="border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#111827] py-2 pl-3 pr-8 outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               <option value="All">All Classes</option>
-              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              {classes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
               value={filterRisk}
@@ -143,7 +218,19 @@ export default function CoordinatorStudents() {
                         <span className={`text-[13px] font-bold ${s.avgMarks < 40 ? 'text-[#EF4444]' : 'text-[#111827]'}`}>{s.avgMarks}</span>
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`text-[14px] font-black ${s.riskScore < 40 ? 'text-[#EF4444]' : s.riskScore < 60 ? 'text-[#F97316]' : 'text-[#10B981]'}`}>{s.riskScore}</span>
+                        <span
+                          className={`text-[14px] font-black ${
+                            s.riskLevel === 'Critical'
+                              ? 'text-[#EF4444]'
+                              : s.riskLevel === 'High'
+                                ? 'text-[#F97316]'
+                                : s.riskLevel === 'Medium'
+                                  ? 'text-[#D97706]'
+                                  : 'text-[#10B981]'
+                          }`}
+                        >
+                          {s.riskScore}
+                        </span>
                       </td>
                       <td className="px-5 py-4">
                         <RiskBadge level={s.riskLevel} />

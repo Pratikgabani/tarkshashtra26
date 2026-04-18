@@ -1,6 +1,12 @@
 'use client';
 
-import { MOCK_STUDENTS, getSystemAggregates } from '@/src/lib/coordinatorData';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  MOCK_STUDENTS,
+  getSystemAggregates,
+  type RiskLevel,
+  type StudentRecord,
+} from '@/src/lib/coordinatorData';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -14,13 +20,128 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export default function ReportsPage() {
+interface ReportsPayload {
+  summary: {
+    total: number;
+    atRisk: number;
+    riskDist: {
+      Low: number;
+      Medium: number;
+      High: number;
+      Critical: number;
+    };
+  };
+  students: StudentRecord[];
+  topRiskStudents: StudentRecord[];
+  generatedAt: string;
+}
+
+function buildFallbackReports(): ReportsPayload {
   const { total, atRisk, riskDist } = getSystemAggregates();
+  const topRiskStudents = MOCK_STUDENTS
+    .filter((student) => student.riskLevel === 'Critical' || student.riskLevel === 'High')
+    .sort((a, b) => a.riskScore - b.riskScore)
+    .slice(0, 5);
+
+  return {
+    summary: { total, atRisk, riskDist },
+    students: MOCK_STUDENTS,
+    topRiskStudents,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function csvEscape(value: string | number): string {
+  const raw = String(value);
+  if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+export default function ReportsPage() {
+  const [data, setData] = useState<ReportsPayload>(() => buildFallbackReports());
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadReports() {
+      try {
+        const response = await fetch('/api/coordinator/reports', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          const fallback = buildFallbackReports();
+          const summary = json.data.summary || fallback.summary;
+          const students = Array.isArray(json.data.students)
+            ? (json.data.students as StudentRecord[])
+            : fallback.students;
+          const topRiskStudents = Array.isArray(json.data.topRiskStudents)
+            ? (json.data.topRiskStudents as StudentRecord[])
+            : fallback.topRiskStudents;
+
+          setData({
+            summary: {
+              total: Number(summary.total) || 0,
+              atRisk: Number(summary.atRisk) || 0,
+              riskDist: {
+                Low: Number(summary.riskDist?.Low) || 0,
+                Medium: Number(summary.riskDist?.Medium) || 0,
+                High: Number(summary.riskDist?.High) || 0,
+                Critical: Number(summary.riskDist?.Critical) || 0,
+              },
+            },
+            students,
+            topRiskStudents,
+            generatedAt: json.data.generatedAt || new Date().toISOString(),
+          });
+
+          setApiError('');
+        } else if (!cancelled) {
+          setApiError(json?.message || 'Unable to load report data. Showing fallback dataset.');
+        }
+      } catch {
+        if (!cancelled) {
+          setApiError('Unable to load report data. Showing fallback dataset.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadReports();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { summary, students, topRiskStudents, generatedAt } = data;
+
+  const printableDate = useMemo(() => {
+    const parsed = new Date(generatedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toLocaleDateString('en-GB');
+    }
+    return parsed.toLocaleDateString('en-GB');
+  }, [generatedAt]);
 
   const handleDownloadCSV = () => {
     const headers = ['ID,Name,Department,Class,Attendance%,AvgMarks,RiskScore,RiskLevel'];
-    const rows = MOCK_STUDENTS.map(s => 
-      `${s.id},${s.name},${s.department},${s.classBatch},${s.attendance},${s.avgMarks},${s.riskScore},${s.riskLevel}`
+    const rows = students.map((student) => 
+      [
+        csvEscape(student.id),
+        csvEscape(student.name),
+        csvEscape(student.department),
+        csvEscape(student.classBatch),
+        csvEscape(student.attendance),
+        csvEscape(student.avgMarks),
+        csvEscape(student.riskScore),
+        csvEscape(student.riskLevel as RiskLevel),
+      ].join(',')
     );
     const csvContent = headers.concat(rows).join('\n');
     
@@ -32,6 +153,7 @@ export default function ReportsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleDownloadPDF = () => {
@@ -45,6 +167,16 @@ export default function ReportsPage() {
       <Topbar title="Generate Reports" subtitle="Export analytical breakdown datasets for local offline review" />
 
       <main className="flex-1 p-8 max-w-5xl w-full mx-auto space-y-8 print:p-0">
+        {loading && (
+          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8] print:hidden">
+            Loading reports data...
+          </div>
+        )}
+        {apiError && (
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C] print:hidden">
+            {apiError}
+          </div>
+        )}
         
         {/* Actions Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:hidden">
@@ -81,13 +213,13 @@ export default function ReportsPage() {
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-10 shadow-sm print:border-none print:shadow-none print:p-0">
            <div className="border-b border-[#E5E7EB] pb-6 mb-8">
              <h2 className="text-2xl font-black text-[#111827]">Academic Risk Overview Report</h2>
-             <p className="text-sm font-semibold text-[#6B7280] mt-1">Generated exactly on {new Date().toLocaleDateString('en-GB')}</p>
+             <p className="text-sm font-semibold text-[#6B7280] mt-1">Generated exactly on {printableDate}</p>
            </div>
 
            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{total}</p></div>
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{atRisk}</p></div>
-             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Critical Tier</p><p className="text-2xl font-black text-[#111827]">{riskDist.Critical}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{summary.total}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{summary.atRisk}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Critical Tier</p><p className="text-2xl font-black text-[#111827]">{summary.riskDist.Critical}</p></div>
            </div>
 
            <h3 className="text-sm font-bold text-[#111827] mb-4 uppercase tracking-widest border-b border-[#E5E7EB] pb-2">High & Critical Risk Roster (Top 5)</h3>
@@ -100,7 +232,7 @@ export default function ReportsPage() {
                </tr>
              </thead>
              <tbody className="divide-y divide-[#E5E7EB]">
-               {MOCK_STUDENTS.filter(s => s.riskLevel === 'Critical' || s.riskLevel === 'High').slice(0, 5).map(s => (
+               {topRiskStudents.map(s => (
                  <tr key={s.id}>
                    <td className="py-4">
                      <p className="text-[13px] font-bold text-[#111827]">{s.name}</p>

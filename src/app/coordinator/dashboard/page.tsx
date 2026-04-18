@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { getSystemAggregates } from '@/src/lib/coordinatorData';
 import { Users, AlertTriangle, Activity, Briefcase } from 'lucide-react';
 import { 
@@ -19,8 +20,86 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export default function CoordinatorDashboard() {
+interface DashboardPayload {
+  total: number;
+  atRisk: number;
+  riskDist: {
+    Low: number;
+    Medium: number;
+    High: number;
+    Critical: number;
+  };
+  deptStats: Array<{
+    department: string;
+    total: number;
+    atRisk: number;
+    riskRate: number;
+  }>;
+  trend: Array<{
+    month: string;
+    atRisk: number;
+    total: number;
+  }>;
+}
+
+function buildFallbackData(): DashboardPayload {
   const { total, atRisk, riskDist, deptStats } = getSystemAggregates();
+  return {
+    total,
+    atRisk,
+    riskDist,
+    deptStats,
+    trend: [
+      { month: 'Jan', atRisk: 42, total },
+      { month: 'Feb', atRisk: 38, total },
+      { month: 'Mar', atRisk: 45, total },
+      { month: 'Apr', atRisk, total },
+    ],
+  };
+}
+
+export default function CoordinatorDashboard() {
+  const [data, setData] = useState<DashboardPayload>(() => buildFallbackData());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch('/api/coordinator/dashboard', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          setData({
+            total: Number(json.data.total) || 0,
+            atRisk: Number(json.data.atRisk) || 0,
+            riskDist: {
+              Low: Number(json.data.riskDist?.Low) || 0,
+              Medium: Number(json.data.riskDist?.Medium) || 0,
+              High: Number(json.data.riskDist?.High) || 0,
+              Critical: Number(json.data.riskDist?.Critical) || 0,
+            },
+            deptStats: Array.isArray(json.data.deptStats) ? json.data.deptStats : [],
+            trend: Array.isArray(json.data.trend) ? json.data.trend : [],
+          });
+        }
+      } catch {
+        // Keep fallback payload when backend is unavailable.
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { total, atRisk, riskDist, deptStats, trend } = data;
 
   const pieData = [
     { name: 'Low Risk', value: riskDist.Low, color: '#10B981' },
@@ -29,19 +108,18 @@ export default function CoordinatorDashboard() {
     { name: 'Critical Risk', value: riskDist.Critical, color: '#EF4444' },
   ];
 
-  // Dummy line chart data for trends
-  const trendData = [
-    { month: 'Jan', atRisk: 42, total: 150 },
-    { month: 'Feb', atRisk: 38, total: 150 },
-    { month: 'Mar', atRisk: 45, total: 150 },
-    { month: 'Apr', atRisk: atRisk, total: 150 },
-  ];
+  const trendData = trend.length > 0 ? trend : buildFallbackData().trend;
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB]">
       <Topbar title="Institution Overview" subtitle="High-level pulse on academic performance blocks" />
 
       <main className="flex-1 p-8 space-y-8 overflow-y-auto max-w-7xl">
+        {loading && (
+          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
+            Loading live coordinator data...
+          </div>
+        )}
         
         {/* Metric Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -62,7 +140,9 @@ export default function CoordinatorDashboard() {
               <div>
                 <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wider mb-2">At-Risk Students</p>
                 <p className="text-3xl font-black text-[#EF4444]">{atRisk}</p>
-                <p className="text-[11px] font-semibold text-[#6B7280] mt-1">{Math.round((atRisk/total)*100)}% of student body</p>
+                <p className="text-[11px] font-semibold text-[#6B7280] mt-1">
+                  {total > 0 ? Math.round((atRisk / total) * 100) : 0}% of student body
+                </p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-[#EF4444]" />

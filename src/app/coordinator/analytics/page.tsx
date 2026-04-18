@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { getSystemAggregates, CLASSES } from '@/src/lib/coordinatorData';
 import { Lightbulb, TrendingDown, Target, Building2, BookOpen } from 'lucide-react';
 import { 
@@ -17,50 +18,122 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export default function CoordinatorAnalytics() {
+interface AnalyticsPayload {
+  total: number;
+  atRisk: number;
+  riskPercentage: number;
+  deptStats: Array<{
+    department: string;
+    total: number;
+    atRisk: number;
+    riskRate: number;
+  }>;
+  classStats: Array<{
+    class: string;
+    avgScore: number;
+    atRiskCount: number;
+  }>;
+  insights: Array<{
+    type: string;
+    text: string;
+    action: string;
+  }>;
+}
+
+function buildFallbackAnalytics(): AnalyticsPayload {
   const { total, atRisk, deptStats } = getSystemAggregates();
-  const riskPercentage = Math.round((atRisk / total) * 100);
+  const riskPercentage = total > 0 ? Math.round((atRisk / total) * 100) : 0;
+  const highestRiskDept = [...deptStats].sort((a, b) => b.riskRate - a.riskRate)[0];
 
-  // Pattern detection insights (Simulated via simple rules on mock data)
-  // Our mock logic intentionally made Mechanical Eng High Risk.
-  const highestRiskDept = [...deptStats].sort((a,b) => b.riskRate - a.riskRate)[0];
+  return {
+    total,
+    atRisk,
+    riskPercentage,
+    deptStats,
+    classStats: CLASSES.map((classBatch, index) => {
+      const seed = classBatch.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      return {
+        class: classBatch,
+        avgScore: 50 + ((seed * 13 + index * 7) % 30),
+        atRiskCount: (seed + index * 5) % 15,
+      };
+    }),
+    insights: [
+      {
+        type: 'Department',
+        text: `${highestRiskDept.department} has the highest risk concentration (${highestRiskDept.riskRate}% of students).`,
+        action: 'Discuss grading patterns with department faculty.',
+      },
+      {
+        type: 'Class',
+        text: 'ME-A has a clustered risk pattern with weak assignment completion trends.',
+        action: 'Run focused remedial planning for this class.',
+      },
+      {
+        type: 'Trend',
+        text: 'Overall attendance has dipped before internal assessments across multiple batches.',
+        action: 'Send attendance escalation alerts and counselor follow-ups.',
+      },
+    ],
+  };
+}
 
-  const insights = [
-    { 
-      type: 'Department', 
-      icon: Building2, 
-      text: `${highestRiskDept.department} has the highest risk concentration (${highestRiskDept.riskRate}% of students).`,
-      action: 'Discuss grading patterns with department faculty.'
-    },
-    { 
-      type: 'Subject', 
-      icon: BookOpen, 
-      text: `Mathematics 101 has consistently low performance across CE-A and CE-B classes.`,
-      action: 'Targeted extra classes recommended.'
-    },
-    { 
-      type: 'Trend', 
-      icon: TrendingDown, 
-      text: `Overall attendance across standard batches has dipped by 4% leading up to midterms.`,
-      action: 'Send automated attendance warning alerts.'
+function getInsightIcon(type: string) {
+  if (type === 'Department') return Building2;
+  if (type === 'Class') return BookOpen;
+  if (type === 'Trend') return TrendingDown;
+  return Lightbulb;
+}
+
+export default function CoordinatorAnalytics() {
+  const [data, setData] = useState<AnalyticsPayload>(() => buildFallbackAnalytics());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAnalytics() {
+      try {
+        const response = await fetch('/api/coordinator/analytics', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          setData({
+            total: Number(json.data.total) || 0,
+            atRisk: Number(json.data.atRisk) || 0,
+            riskPercentage: Number(json.data.riskPercentage) || 0,
+            deptStats: Array.isArray(json.data.deptStats) ? json.data.deptStats : [],
+            classStats: Array.isArray(json.data.classStats) ? json.data.classStats : [],
+            insights: Array.isArray(json.data.insights) ? json.data.insights : [],
+          });
+        }
+      } catch {
+        // Keep fallback analytics payload.
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-  ];
 
-  // Dummy Class stats
-  const classStats = CLASSES.map((c, index) => {
-    const seed = c.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    return {
-      class: c,
-      avgScore: 50 + ((seed * 13 + index * 7) % 30),
-      atRiskCount: (seed + index * 5) % 15
-    }
-  });
+    void loadAnalytics();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { riskPercentage, deptStats, classStats, insights } = data;
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB]">
       <Topbar title="Aggregate Analytics & Patterns" subtitle="Automated insights and deep drill-downs into risk vectors" />
 
       <main className="flex-1 p-8 space-y-8 overflow-y-auto max-w-7xl">
+        {loading && (
+          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
+            Loading analytics from backend...
+          </div>
+        )}
         
         {/* Core Percentage Card */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-8 flex items-center justify-between shadow-sm">
@@ -90,7 +163,7 @@ export default function CoordinatorAnalytics() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {insights.map((ins, i) => {
-              const Icon = ins.icon;
+              const Icon = getInsightIcon(ins.type);
               return (
                 <div key={i} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-5 hover:border-blue-300 transition-colors">
                   <div className="flex items-center gap-2 mb-3">
@@ -129,7 +202,7 @@ export default function CoordinatorAnalytics() {
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Department Risk Rates</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">Percentage of at-risk students by department</p>
             <div className="space-y-4">
-              {deptStats.sort((a,b) => b.riskRate - a.riskRate).map(d => (
+              {[...deptStats].sort((a, b) => b.riskRate - a.riskRate).map(d => (
                 <div key={d.department}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-[13px] font-bold text-[#111827]">{d.department}</span>

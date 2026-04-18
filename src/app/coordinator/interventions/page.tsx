@@ -1,6 +1,7 @@
 'use client';
 
-import { MOCK_INTERVENTIONS } from '@/src/lib/coordinatorData';
+import { useEffect, useState } from 'react';
+import { MOCK_INTERVENTIONS, type InterventionRecord } from '@/src/lib/coordinatorData';
 import { Activity, ArrowUpRight } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -15,11 +16,80 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function InterventionMonitoring() {
+  const [interventions, setInterventions] = useState<InterventionRecord[]>(MOCK_INTERVENTIONS);
+  const [metrics, setMetrics] = useState({
+    totalInterventions: MOCK_INTERVENTIONS.length,
+    improvedCases: MOCK_INTERVENTIONS.filter((item) => item.scoreAfter > item.scoreBefore).length,
+    avgImprovement:
+      MOCK_INTERVENTIONS.length > 0
+        ? Math.round(
+            MOCK_INTERVENTIONS.reduce(
+              (sum, item) => sum + (item.scoreAfter - item.scoreBefore),
+              0
+            ) / MOCK_INTERVENTIONS.length
+          )
+        : 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInterventions() {
+      try {
+        const response = await fetch('/api/coordinator/interventions', { cache: 'no-store' });
+        const json = await response.json();
+
+        if (!cancelled && response.ok && json?.success && json?.data) {
+          setInterventions(
+            Array.isArray(json.data.interventions)
+              ? (json.data.interventions as InterventionRecord[])
+              : []
+          );
+
+          setMetrics({
+            totalInterventions: Number(json.data.metrics?.totalInterventions) || 0,
+            improvedCases: Number(json.data.metrics?.improvedCases) || 0,
+            avgImprovement: Number(json.data.metrics?.avgImprovement) || 0,
+          });
+
+          setApiError('');
+        } else if (!cancelled) {
+          setApiError(json?.message || 'Unable to load interventions. Showing fallback data.');
+        }
+      } catch {
+        if (!cancelled) {
+          setApiError('Unable to load interventions. Showing fallback data.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInterventions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-hidden">
       <Topbar title="Intervention Tracking" subtitle="Monitor the effectiveness of actions taken by faculty and mentors" />
 
       <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-6xl mx-auto w-full">
+        {loading && (
+          <div className="mb-4 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
+            Loading intervention records...
+          </div>
+        )}
+        {apiError && (
+          <div className="mb-4 bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {apiError}
+          </div>
+        )}
         
         {/* Metric Header */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-6 shadow-sm mb-6 flex items-center gap-6 shrink-0">
@@ -27,8 +97,12 @@ export default function InterventionMonitoring() {
              <Activity className="w-6 h-6 text-[#2563EB]" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-[#111827]">{MOCK_INTERVENTIONS.length} Logged Interventions</h2>
-            <p className="text-[13px] font-medium text-[#6B7280] mt-1">Reviewing the &quot;Score Before vs After&quot; effectiveness metrics</p>
+            <h2 className="text-2xl font-black text-[#111827]">
+              {metrics.totalInterventions} Logged Interventions
+            </h2>
+            <p className="text-[13px] font-medium text-[#6B7280] mt-1">
+              {metrics.improvedCases} improved cases • Avg improvement {metrics.avgImprovement >= 0 ? '+' : ''}{metrics.avgImprovement} pts
+            </p>
           </div>
         </div>
 
@@ -46,7 +120,13 @@ export default function InterventionMonitoring() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
-                {MOCK_INTERVENTIONS.map((inv) => {
+                {interventions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-sm font-medium text-[#6B7280]">
+                      No intervention records found.
+                    </td>
+                  </tr>
+                ) : interventions.map((inv) => {
                   const diff = inv.scoreAfter - inv.scoreBefore;
                   const isPositive = diff > 0;
                   return (
