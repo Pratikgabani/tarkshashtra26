@@ -41,12 +41,123 @@ interface MarkUpdate {
   marks: number | null;
 }
 
+interface CreateSubjectInput {
+  name: string;
+  code: string;
+  semester: number;
+  maxMarks: number;
+}
+
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
       <div>
         <h1 className="text-sm font-semibold text-gray-900">{title}</h1>
         {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function AddSubjectModal({
+  onClose,
+  onSubmit,
+  submitting,
+}: {
+  onClose: () => void;
+  onSubmit: (payload: CreateSubjectInput) => void;
+  submitting: boolean;
+}) {
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [semester, setSemester] = useState(3);
+  const [maxMarks, setMaxMarks] = useState(100);
+
+  const normalizedCode = code.trim().toUpperCase().replace(/\s+/g, '');
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Add Subject</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600" disabled={submitting}>
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Subject Name</label>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. Data Structures"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Code</label>
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="e.g. CS301"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm uppercase"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Semester</label>
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={semester}
+                onChange={(event) => setSemester(Number(event.target.value) || 0)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Max Marks</label>
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                value={maxMarks}
+                onChange={(event) => setMaxMarks(Number(event.target.value) || 0)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50"
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onSubmit({
+                name: name.trim(),
+                code: normalizedCode,
+                semester,
+                maxMarks,
+              });
+            }}
+            disabled={submitting || !name.trim() || !normalizedCode || semester < 1 || semester > 8 || maxMarks < 1}
+            className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+          >
+            {submitting ? 'Creating...' : 'Create Subject'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -203,6 +314,21 @@ export default function TeacherMarksPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [creatingSubject, setCreatingSubject] = useState(false);
+
+  function applyMarksPayload(payload: MarksPageData) {
+    setData(payload);
+    setEditableMarks(payload.marks || {});
+    setOriginalMarks(payload.marks || {});
+    setActiveSubjectId((previous) => {
+      if (previous && payload.subjects.some((subject) => subject.id === previous)) {
+        return previous;
+      }
+
+      return payload.subjects[0]?.id || '';
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -214,9 +340,7 @@ export default function TeacherMarksPage() {
 
         if (!cancelled && response.ok && json?.success && json?.data) {
           const payload = json.data as MarksPageData;
-          setData(payload);
-          setEditableMarks(payload.marks || {});
-          setOriginalMarks(payload.marks || {});
+          applyMarksPayload(payload);
           setError('');
         } else if (!cancelled) {
           setError(json?.message || 'Failed to load marks data');
@@ -332,9 +456,7 @@ export default function TeacherMarksPage() {
 
       if (response.ok && json?.success && json?.data) {
         const payload = json.data as MarksPageData;
-        setData(payload);
-        setEditableMarks(payload.marks || {});
-        setOriginalMarks(payload.marks || {});
+        applyMarksPayload(payload);
         setNotice('Marks saved successfully.');
       } else {
         const details = Array.isArray(json?.errors) ? ` ${json.errors.join(' | ')}` : '';
@@ -509,9 +631,7 @@ export default function TeacherMarksPage() {
 
       if (response.ok && json?.success && json?.data) {
         const payload = json.data as MarksPageData;
-        setData(payload);
-        setEditableMarks(payload.marks || {});
-        setOriginalMarks(payload.marks || {});
+        applyMarksPayload(payload);
         setNotice(`CSV upload completed. ${updates.length} marks updated.`);
       } else {
         setError(json?.message || 'CSV upload failed.');
@@ -527,6 +647,49 @@ export default function TeacherMarksPage() {
     if (uploading) return;
     setError('');
     csvInputRef.current?.click();
+  }
+
+  async function createSubject(payload: CreateSubjectInput) {
+    setCreatingSubject(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/teacher/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json?.success) {
+        setError(json?.message || 'Failed to create subject.');
+        return;
+      }
+
+      const createdSubjectId = json?.data?.subject?.id as string | undefined;
+
+      const refreshedResponse = await fetch('/api/teacher/marks', { cache: 'no-store' });
+      const refreshedJson = await refreshedResponse.json();
+
+      if (refreshedResponse.ok && refreshedJson?.success && refreshedJson?.data) {
+        const refreshedPayload = refreshedJson.data as MarksPageData;
+        applyMarksPayload(refreshedPayload);
+        if (createdSubjectId) {
+          setActiveSubjectId(createdSubjectId);
+        }
+
+        setShowAddSubjectModal(false);
+        setNotice('Subject created successfully.');
+      } else {
+        setShowAddSubjectModal(false);
+        setError('Subject created, but failed to refresh marks data. Please reload the page.');
+      }
+    } catch {
+      setError('Failed to create subject.');
+    } finally {
+      setCreatingSubject(false);
+    }
   }
 
   if (loading) {
@@ -554,6 +717,16 @@ export default function TeacherMarksPage() {
     <div className="flex flex-col flex-1">
       <Topbar title="Marks Entry" subtitle="Enter marks, save updates, and use CSV mass upload" />
 
+      {showAddSubjectModal && (
+        <AddSubjectModal
+          onClose={() => setShowAddSubjectModal(false)}
+          onSubmit={(payload) => {
+            void createSubject(payload);
+          }}
+          submitting={creatingSubject}
+        />
+      )}
+
       <main className="flex-1 p-6 space-y-4">
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
@@ -568,21 +741,37 @@ export default function TeacherMarksPage() {
         )}
 
         <div className="bg-white border border-gray-200 rounded-lg px-5 py-3 flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 border border-gray-200 rounded-md p-0.5 bg-gray-50">
-            {data.subjects.map((subject) => (
-              <button
-                key={subject.id}
-                type="button"
-                onClick={() => setActiveSubjectId(subject.id)}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                  activeSubject?.id === subject.id
-                    ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {subject.name}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {data.subjects.length > 0 ? (
+              <div className="flex gap-1 border border-gray-200 rounded-md p-0.5 bg-gray-50">
+                {data.subjects.map((subject) => (
+                  <button
+                    key={subject.id}
+                    type="button"
+                    onClick={() => setActiveSubjectId(subject.id)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      activeSubject?.id === subject.id
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {subject.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="px-3 py-1.5 rounded border border-amber-200 bg-amber-50 text-xs font-medium text-amber-700">
+                No subjects added yet
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowAddSubjectModal(true)}
+              className="px-2.5 py-1.5 rounded border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              + Add Subject
+            </button>
           </div>
 
           <div className="h-5 w-px bg-gray-200" />
@@ -651,6 +840,13 @@ export default function TeacherMarksPage() {
             </button>
           </div>
         </div>
+
+        {data.subjects.length === 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+            No subjects are currently assigned to your account. Click <strong>Add Subject</strong> to create one,
+            then you can enter marks and use CSV upload.
+          </div>
+        )}
 
         <div className="flex items-center gap-4 text-xs text-gray-500">
           <span className="text-gray-400">
