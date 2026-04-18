@@ -2,18 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { Search, Filter, Layers, LayoutGrid, ChevronRight, LayoutList } from 'lucide-react';
 
 const StudentDetailModal = dynamic(() => import('@/src/components/mentor/StudentDetailModal'), { ssr: false });
 
 // ─── Types ────────────────────────────────────────────────
-
-interface StudentRow {
-  id: string; name: string; studentId: string; batch: string; semester: number;
-  attendance: number; marks: number; riskScore: number; riskLevel: string;
-}
+interface StudentRow { id: string; name: string; studentId: string; batch: string; semester: number; attendance: number; marks: number; riskScore: number; riskLevel: string; }
 
 // ─── Dummy Data ───────────────────────────────────────────
-
 const DUMMY_STUDENTS: StudentRow[] = [
   { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', semester: 3, attendance: 38, marks: 22, riskScore: 82, riskLevel: 'critical' },
   { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', semester: 3, attendance: 35, marks: 18, riskScore: 78, riskLevel: 'critical' },
@@ -29,25 +25,33 @@ const DUMMY_STUDENTS: StudentRow[] = [
   { id: '12', name: 'Dev Nair', studentId: '22CE007', batch: 'CE-A', semester: 3, attendance: 92, marks: 78, riskScore: 12, riskLevel: 'low' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────
-
-const RISK_CFG: Record<string, { bg: string; text: string; dot: string }> = {
-  low:      { bg: 'bg-green-50 border-green-200', text: 'text-green-700', dot: 'bg-green-500' },
-  medium:   { bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700', dot: 'bg-yellow-500' },
-  high:     { bg: 'bg-orange-50 border-orange-200', text: 'text-orange-700', dot: 'bg-orange-500' },
-  critical: { bg: 'bg-red-50 border-red-200', text: 'text-red-700', dot: 'bg-red-500' },
+const RISK_CFG: Record<string, { bg: string; text: string; border: string }> = {
+  low:      { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  medium:   { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  high:     { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
 };
 
-function riskBadge(level: string) {
+function RiskBadge({ level }: { level: string }) {
   const c = RISK_CFG[level] || RISK_CFG.medium;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-semibold ${c.bg} ${c.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} /> {level.charAt(0).toUpperCase() + level.slice(1)}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}>
+      {level.charAt(0).toUpperCase() + level.slice(1)}
     </span>
   );
 }
 
-// ─── Component ────────────────────────────────────────────
+// ─── Reusable Topbar ────────────────────────────────────────────────────────
+function Topbar({ title, subtitle }: { title: string; subtitle?: string; }) {
+  return (
+    <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+      <div>
+        <h1 className="text-lg font-bold text-gray-900 tracking-tight">{title}</h1>
+        {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -67,105 +71,131 @@ export default function StudentsPage() {
           const res = await fetch(`/api/mentor/students?${params}`);
           const json = await res.json();
           if (res.ok && json.data && json.data.length > 0) {
-            setStudents(json.data);
-            setLoading(false);
-            return;
+            setStudents(json.data); setLoading(false); return;
           }
         }
       } catch { /* fallback */ }
-      setStudents(DUMMY_STUDENTS);
-      setLoading(false);
+      setStudents(DUMMY_STUDENTS); setLoading(false);
     }
     load();
   }, []);
 
-  // Check URL for ?view=xxx
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const viewId = params.get('view');
     if (viewId) setSelectedStudentId(viewId);
   }, []);
 
-  // Filters
   let filtered = students;
   if (search.trim()) filtered = filtered.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
   if (riskFilter !== 'all') filtered = filtered.filter(s => s.riskLevel === riskFilter);
   if (batchFilter !== 'all') filtered = filtered.filter(s => s.batch === batchFilter);
-
   const batches = [...new Set(students.map(s => s.batch))].filter(Boolean).sort();
 
   return (
-    <div className="flex flex-col flex-1">
-      {/* Topbar */}
-      <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center shrink-0">
-        <div>
-          <h1 className="text-sm font-semibold text-[#111827]">Student List</h1>
-          <p className="text-xs text-[#6B7280]">All assigned students — filter by risk level, batch, or search</p>
-        </div>
-      </div>
+    <div className="flex flex-col flex-1 bg-gray-50/30">
+      <Topbar title="Assigned Students" subtitle="Manage and monitor risk profiles of all assigned students." />
 
-      <main className="flex-1 p-6 space-y-4">
+      <main className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
+        
         {/* Filters */}
-        <div className="bg-white border border-[#E5E7EB] rounded-lg px-5 py-3 flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search students…"
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs text-[#111827] placeholder-[#6B7280] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]" />
+        <div className="bg-white border text-sm border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input 
+              type="text" value={search} onChange={e => setSearch(e.target.value)} 
+              placeholder="Search by student name or ID..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
           </div>
-          <div className="h-5 w-px bg-gray-200" />
-          <div className="flex gap-1">
+
+          <div className="h-8 w-px bg-gray-200 hidden sm:block" />
+
+          <div className="flex bg-gray-100/50 p-1 rounded-xl w-full sm:w-auto">
             {['all', 'low', 'medium', 'high', 'critical'].map(r => (
               <button key={r} onClick={() => setRiskFilter(r)}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${riskFilter === r ? 'bg-[#2563EB] text-white' : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'}`}>
+                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${riskFilter === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>
                 {r.charAt(0).toUpperCase() + r.slice(1)}
               </button>
             ))}
           </div>
-          <div className="h-5 w-px bg-gray-200" />
-          <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)}
-            className="border border-gray-200 rounded px-3 py-1.5 text-xs text-[#111827] focus:outline-none focus:ring-1 focus:ring-[#2563EB]">
-            <option value="all">All Batches</option>
-            {batches.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
+
+          <div className="h-8 w-px bg-gray-200 hidden sm:block" />
+
+          <div className="relative w-full sm:w-40 shrink-0">
+            <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)}
+              className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none">
+              <option value="all">All Batches</option>
+              {batches.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white border border-[#E5E7EB] rounded-lg overflow-hidden">
+        {/* Table View */}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden box-border">
           {loading ? (
-            <div className="flex items-center justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-[3px] border-gray-200 border-t-[#2563EB]" /></div>
+            <div className="flex items-center justify-center py-20">
+              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+            </div>
           ) : filtered.length === 0 ? (
-            <p className="py-16 text-center text-xs text-[#6B7280]">No students match the current filters.</p>
+            <div className="py-20 text-center flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center mb-4"><Filter className="w-6 h-6 text-gray-400"/></div>
+              <p className="text-gray-900 font-bold">No students found</p>
+              <p className="text-sm font-medium text-gray-500 mt-1">Try adjusting your filters or search terms.</p>
+            </div>
           ) : (
-            <div className="overflow-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+                <thead className="bg-gray-50/80 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280]">Student</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Batch</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Attendance</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Marks</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Risk Score</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Level</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-[#6B7280]">Action</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Student Profile</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Batch Info</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Metrics</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Risk Analytics</th>
+                    <th className="px-6 py-4 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((s, i) => {
                     const isHigh = s.riskLevel === 'high' || s.riskLevel === 'critical';
                     return (
-                      <tr key={s.id} className={`border-b border-gray-50 ${isHigh ? 'bg-red-50/30' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} hover:bg-gray-50`}>
-                        <td className="px-4 py-3"><p className="text-xs font-semibold text-[#111827]">{s.name}</p><p className="text-[10px] text-[#6B7280]">{s.studentId}</p></td>
-                        <td className="px-3 py-3 text-xs text-[#6B7280]">{s.batch}</td>
-                        <td className="px-3 py-3"><span className={`text-xs font-semibold ${s.attendance < 75 ? 'text-red-600' : 'text-[#111827]'}`}>{s.attendance}%</span></td>
-                        <td className="px-3 py-3"><span className={`text-xs font-semibold ${s.marks < 40 ? 'text-red-600' : 'text-[#111827]'}`}>{s.marks}%</span></td>
-                        <td className="px-3 py-3"><span className={`text-xs font-bold ${s.riskScore >= 75 ? 'text-red-600' : s.riskScore >= 50 ? 'text-orange-600' : s.riskScore >= 25 ? 'text-yellow-600' : 'text-green-600'}`}>{s.riskScore}</span></td>
-                        <td className="px-3 py-3">{riskBadge(s.riskLevel)}</td>
-                        <td className="px-3 py-3">
+                      <tr key={s.id} className={`border-b border-gray-100 transition-colors ${isHigh ? 'bg-red-50/20' : 'hover:bg-gray-50/50'}`}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${isHigh ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {s.name.split(' ').map(n=>n[0]).join('')}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-900">{s.name}</p>
+                              <p className="text-[11px] font-medium text-gray-500 mt-0.5">{s.studentId}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-xs font-bold">{s.batch}</span>
+                          <span className="ml-2 text-xs font-medium text-gray-500">Sem {s.semester}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-4">
+                            <div>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase">Attend</p>
+                               <p className={`text-xs font-black ${s.attendance < 75 ? 'text-red-500' : 'text-gray-900'}`}>{s.attendance}%</p>
+                            </div>
+                            <div>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase">Marks</p>
+                               <p className={`text-xs font-black ${s.marks < 40 ? 'text-orange-500' : 'text-gray-900'}`}>{s.marks}%</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 flex items-center gap-4">
+                          <RiskBadge level={s.riskLevel} />
+                          <div className={`text-xs font-black px-2 py-1 rounded-md ${s.riskScore >= 75 ? 'bg-red-100 text-red-700' : s.riskScore >= 50 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>{s.riskScore}/100</div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
                           <button onClick={() => setSelectedStudentId(s.id)}
-                            className="px-3 py-1 rounded border border-[#2563EB] text-[11px] font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white transition-colors">
-                            View Details
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors box-border">
+                            Details <ChevronRight className="w-3 h-3" />
                           </button>
                         </td>
                       </tr>
@@ -175,8 +205,8 @@ export default function StudentsPage() {
               </table>
             </div>
           )}
-          <div className="px-5 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-[#6B7280]">
-            Showing <strong className="text-[#111827]">{filtered.length}</strong> of {students.length} students
+          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs font-medium text-gray-500">
+            <p>Showing <strong className="text-gray-900">{filtered.length}</strong> of {students.length} students</p>
           </div>
         </div>
       </main>
