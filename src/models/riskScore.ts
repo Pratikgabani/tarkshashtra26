@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export type RiskLevel = "low" | "medium" | "high";
+export type RiskScoreSource = "external_predict" | "database_fallback";
 
 export interface IRiskFactor {
   factor: string;
@@ -19,6 +20,7 @@ export interface IRiskScore extends Document {
   riskLevel: RiskLevel;
   factors: IRiskFactor[];
   calculatedAt: Date;
+  source?: RiskScoreSource;
 }
 
 const RiskFactorSchema = new Schema(
@@ -46,6 +48,11 @@ const RiskScoreSchema: Schema<IRiskScore> = new Schema(
     },
     factors: [RiskFactorSchema],
     calculatedAt: { type: Date, default: Date.now },
+    source: {
+      type: String,
+      enum: ["external_predict", "database_fallback"],
+      required: false,
+    },
   },
   { timestamps: true }
 );

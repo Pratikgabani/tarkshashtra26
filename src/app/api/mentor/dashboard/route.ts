@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
-import RiskScore from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
 import MentorAction from "@/src/models/mentorAction";
+import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 /**
  * GET /api/mentor/dashboard?mentorId=xxx
@@ -30,15 +30,8 @@ export async function GET(request: NextRequest) {
     const students = await User.find({ assignedMentorId: mentorId, role: "student" }).lean();
     const studentIds = students.map((s) => s._id);
 
-    // Latest risk score per student
-    const riskScores = await RiskScore.aggregate([
-      { $match: { studentId: { $in: studentIds } } },
-      { $sort: { calculatedAt: -1 } },
-      { $group: { _id: "$studentId", doc: { $first: "$$ROOT" } } },
-      { $replaceRoot: { newRoot: "$doc" } },
-    ]);
-
-    const riskMap = new Map(riskScores.map((r) => [r.studentId.toString(), r]));
+    const latestRiskMap = await ensureLatestRiskScores(studentIds);
+    const riskScores = Array.from(latestRiskMap.values());
 
     let low = 0, medium = 0, high = 0;
     for (const r of riskScores) {
@@ -63,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     // Build student list with risk
     const studentList = students.map((s) => {
-      const risk = riskMap.get(s._id.toString());
+      const risk = latestRiskMap.get(s._id.toString());
       return {
         id: s._id.toString(),
         name: s.fullName,

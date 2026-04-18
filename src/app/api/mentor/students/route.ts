@@ -5,8 +5,8 @@ import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionA
 import User from "@/src/models/user";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
-import RiskScore from "@/src/models/riskScore";
 import Subject from "@/src/models/subject";
+import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 const VALID_RISK_FILTERS = new Set(["all", "low", "medium", "high"]);
 
@@ -118,14 +118,7 @@ export async function GET(request: NextRequest) {
 
     const studentIds = filteredStudents.map((s) => s._id);
 
-    // Latest risk scores
-    const riskScores = await RiskScore.aggregate([
-      { $match: { studentId: { $in: studentIds } } },
-      { $sort: { calculatedAt: -1 } },
-      { $group: { _id: "$studentId", doc: { $first: "$$ROOT" } } },
-      { $replaceRoot: { newRoot: "$doc" } },
-    ]);
-    const riskMap = new Map(riskScores.map((r) => [r.studentId.toString(), r]));
+    const latestRiskMap = await ensureLatestRiskScores(studentIds);
 
     // Attendance aggregate per student
     const attAgg = await Attendance.aggregate([
@@ -142,7 +135,7 @@ export async function GET(request: NextRequest) {
     const marksMap = new Map(marksAgg.map((m) => [m._id.toString(), Math.round((m.totalObtained / m.totalMax) * 100)]));
 
     let result = filteredStudents.map((s) => {
-      const risk = riskMap.get(s._id.toString());
+      const risk = latestRiskMap.get(s._id.toString());
       return {
         id: s._id.toString(),
         name: s.fullName,

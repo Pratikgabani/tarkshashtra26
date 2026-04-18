@@ -4,6 +4,8 @@ import MentorAction from "@/src/models/mentorAction";
 import RiskScore from "@/src/models/riskScore";
 import StudentAssignment from "@/src/models/studentAssignment";
 import User from "@/src/models/user";
+import mongoose from "mongoose";
+import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 export type CoordinatorRiskLevel = "Low" | "Medium" | "High";
 
@@ -43,7 +45,6 @@ export interface CoordinatorSystemAggregates {
 }
 
 interface LatestRiskDoc {
-  studentId: { toString(): string };
   score: number;
   riskLevel: string;
   factors?: Array<{
@@ -71,60 +72,10 @@ function mapDbRiskLevel(level: string | undefined): CoordinatorRiskLevel | null 
   }
 }
 
-function riskLevelFromHealthScore(score: number): CoordinatorRiskLevel {
-  if (score < 60) return "High";
-  if (score < 75) return "Medium";
-  return "Low";
-}
-
-function predictedDbLevelLowWorse(score: number): string {
-  if (score < 60) return "high";
-  if (score < 75) return "medium";
-  return "low";
-}
-
-function predictedDbLevelHighWorse(score: number): string {
-  if (score <= 25) return "low";
-  if (score <= 50) return "medium";
-  return "high";
-}
-
-function normalizeRiskToHealthScore(score: number, riskLevel?: string): number {
-  const bounded = Math.max(0, Math.min(100, Math.round(score)));
-  const dbLevel = (riskLevel || "").toLowerCase();
-
-  const lowWorseMatches = dbLevel && predictedDbLevelLowWorse(bounded) === dbLevel;
-  const highWorseMatches = dbLevel && predictedDbLevelHighWorse(bounded) === dbLevel;
-
-  if (lowWorseMatches && !highWorseMatches) {
-    return bounded;
-  }
-  if (highWorseMatches && !lowWorseMatches) {
-    return 100 - bounded;
-  }
-
-  // Favor common risk-score semantics in this codebase (higher score = higher risk).
-  return 100 - bounded;
-}
-
-function calculateHealthScoreFromInputs(
-  attendance: number,
-  marks: number,
-  assignmentCompletionRate: number
-): number {
-  let score = 100;
-
-  if (attendance < 75) {
-    score -= (75 - attendance) * 1.5;
-  }
-  if (marks < 50) {
-    score -= (50 - marks) * 0.8;
-  }
-  if (assignmentCompletionRate < 80) {
-    score -= (80 - assignmentCompletionRate) * 0.5;
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+function riskLevelFromPredictedScore(score: number): CoordinatorRiskLevel {
+  if (score <= 25) return "Low";
+  if (score <= 50) return "Medium";
+  return "High";
 }
 
 function buildRiskExplanation(
@@ -167,14 +118,34 @@ async function loadLatestRiskMap(studentIds: Array<unknown>): Promise<Map<string
     return new Map<string, LatestRiskDoc>();
   }
 
-  const latestRisk = (await RiskScore.aggregate([
-    { $match: { studentId: { $in: studentIds } } },
-    { $sort: { calculatedAt: -1 } },
-    { $group: { _id: "$studentId", doc: { $first: "$$ROOT" } } },
-    { $replaceRoot: { newRoot: "$doc" } },
-  ])) as LatestRiskDoc[];
+  const objectIds = studentIds
+    .map((id) => {
+      if (id instanceof mongoose.Types.ObjectId) return id;
+      const asString =
+        typeof id === "string"
+          ? id
+          : id && typeof (id as { toString?: () => string }).toString === "function"
+            ? (id as { toString: () => string }).toString()
+            : "";
 
-  return new Map(latestRisk.map((risk) => [risk.studentId.toString(), risk]));
+      return mongoose.Types.ObjectId.isValid(asString)
+        ? new mongoose.Types.ObjectId(asString)
+        : null;
+    })
+    .filter((id): id is mongoose.Types.ObjectId => id !== null);
+
+  const latestRiskSnapshots = await ensureLatestRiskScores(objectIds);
+
+  return new Map(
+    Array.from(latestRiskSnapshots.entries()).map(([studentId, snapshot]) => [
+      studentId,
+      {
+        score: snapshot.score,
+        riskLevel: snapshot.riskLevel,
+        factors: snapshot.factors,
+      },
+    ])
+  );
 }
 
 async function loadAttendanceMap(studentIds: Array<unknown>): Promise<Map<string, number>> {
@@ -285,12 +256,12 @@ export async function buildCoordinatorStudentRecords(): Promise<CoordinatorStude
       assignment.total > 0 ? roundPercent(assignment.completed, assignment.total) : 100;
 
     const latestRisk = latestRiskMap.get(dbId);
-    const healthScore = latestRisk
-      ? normalizeRiskToHealthScore(latestRisk.score, latestRisk.riskLevel)
-      : calculateHealthScoreFromInputs(attendance, avgMarks, assignmentCompletionRate);
+    const predictedRiskScore = latestRisk
+      ? Math.max(0, Math.min(100, Math.round(latestRisk.score)))
+      : 0;
 
     const mappedRiskLevel = latestRisk ? mapDbRiskLevel(latestRisk.riskLevel) : null;
-    const riskLevel = mappedRiskLevel || riskLevelFromHealthScore(healthScore);
+    const riskLevel = mappedRiskLevel || riskLevelFromPredictedScore(predictedRiskScore);
 
     return {
       id: (student.studentId || dbId).trim(),
@@ -302,7 +273,7 @@ export async function buildCoordinatorStudentRecords(): Promise<CoordinatorStude
       avgMarks,
       assignmentsCompleted: assignment.completed,
       totalAssignments: assignment.total,
-      riskScore: healthScore,
+      riskScore: predictedRiskScore,
       riskLevel,
       riskExplanation: buildRiskExplanation(
         riskLevel,
@@ -599,15 +570,15 @@ export async function buildCoordinatorInterventions(limit = 300): Promise<{
     const latest = scores.length > 0 ? scores[scores.length - 1] : null;
 
     const scoreBefore = before
-      ? normalizeRiskToHealthScore(before.score, before.riskLevel)
+      ? Math.max(0, Math.min(100, Math.round(before.score)))
       : latest
-        ? normalizeRiskToHealthScore(latest.score, latest.riskLevel)
+        ? Math.max(0, Math.min(100, Math.round(latest.score)))
         : 0;
 
     const scoreAfter = after
-      ? normalizeRiskToHealthScore(after.score, after.riskLevel)
+      ? Math.max(0, Math.min(100, Math.round(after.score)))
       : latest
-        ? normalizeRiskToHealthScore(latest.score, latest.riskLevel)
+        ? Math.max(0, Math.min(100, Math.round(latest.score)))
         : scoreBefore;
 
     const student = userMap.get(studentDbId);
@@ -627,11 +598,11 @@ export async function buildCoordinatorInterventions(limit = 300): Promise<{
   });
 
   const totalInterventions = interventions.length;
-  const improvedCases = interventions.filter((entry) => entry.scoreAfter > entry.scoreBefore).length;
+  const improvedCases = interventions.filter((entry) => entry.scoreAfter < entry.scoreBefore).length;
   const avgImprovement =
     totalInterventions > 0
       ? Math.round(
-        interventions.reduce((sum, entry) => sum + (entry.scoreAfter - entry.scoreBefore), 0) /
+        interventions.reduce((sum, entry) => sum + (entry.scoreBefore - entry.scoreAfter), 0) /
             totalInterventions
       )
       : 0;
@@ -652,7 +623,7 @@ export function buildTopRiskStudents(students: CoordinatorStudentRecord[], count
     .sort((a, b) => {
       const severityDiff = scoreSeverity(b.riskLevel) - scoreSeverity(a.riskLevel);
       if (severityDiff !== 0) return severityDiff;
-      return a.riskScore - b.riskScore;
+      return b.riskScore - a.riskScore;
     })
     .slice(0, count);
 }

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => {
         const severityDiff = severity(b.riskLevel) - severity(a.riskLevel);
         if (severityDiff !== 0) return severityDiff;
-        return a.riskScore - b.riskScore;
+        return b.riskScore - a.riskScore;
       });
 
     return NextResponse.json({

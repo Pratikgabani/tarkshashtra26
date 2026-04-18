@@ -8,6 +8,7 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import RiskScore from "@/src/models/riskScore";
 import MentorAction from "@/src/models/mentorAction";
 import MentorRemark from "@/src/models/mentorRemark";
+import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 interface PopulatedAssignmentRef {
   title?: string;
@@ -59,6 +60,11 @@ export async function GET(
     if (!student || student.role !== "student" || student.assignedMentorId !== mentorId) {
       return NextResponse.json({ success: false, message: "Student not found" }, { status: 404 });
     }
+
+    await ensureLatestRiskScores([student._id], {
+      forceRefresh: true,
+      maxAgeMinutes: 0,
+    });
 
     // Risk scores history
     const riskHistory = await RiskScore.find({ studentId })

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import User from "@/src/models/user";
-import RiskScore from "@/src/models/riskScore";
 import Attendance from "@/src/models/attendance";
 import Assessment from "@/src/models/assessment";
 import MentorAction from "@/src/models/mentorAction";
 import MentorRemark from "@/src/models/mentorRemark";
+import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 type ReportFormat = "csv" | "pdf";
 
@@ -101,8 +101,13 @@ export async function GET(
       return NextResponse.json({ success: false, message: "Student not found" }, { status: 404 });
     }
 
-    const [latestRisk, attendanceAgg, marksAgg, actions] = await Promise.all([
-      RiskScore.findOne({ studentId: student._id }).sort({ calculatedAt: -1 }).lean(),
+    const latestRiskMap = await ensureLatestRiskScores([student._id], {
+      forceRefresh: true,
+      maxAgeMinutes: 0,
+    });
+    const latestRisk = latestRiskMap.get(student._id.toString()) || null;
+
+    const [attendanceAgg, marksAgg, actions] = await Promise.all([
       Attendance.aggregate([
         { $match: { studentId: student._id } },
         {
