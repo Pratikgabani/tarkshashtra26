@@ -1,8 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MOCK_INTERVENTIONS, type InterventionRecord } from '@/src/lib/coordinatorData';
 import { Activity, ArrowUpRight } from 'lucide-react';
+
+interface InterventionRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  facultyName: string;
+  type: string;
+  date: string;
+  scoreBefore: number;
+  scoreAfter: number;
+}
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -16,19 +26,11 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 export default function InterventionMonitoring() {
-  const [interventions, setInterventions] = useState<InterventionRecord[]>(MOCK_INTERVENTIONS);
+  const [interventions, setInterventions] = useState<InterventionRecord[]>([]);
   const [metrics, setMetrics] = useState({
-    totalInterventions: MOCK_INTERVENTIONS.length,
-    improvedCases: MOCK_INTERVENTIONS.filter((item) => item.scoreAfter > item.scoreBefore).length,
-    avgImprovement:
-      MOCK_INTERVENTIONS.length > 0
-        ? Math.round(
-            MOCK_INTERVENTIONS.reduce(
-              (sum, item) => sum + (item.scoreAfter - item.scoreBefore),
-              0
-            ) / MOCK_INTERVENTIONS.length
-          )
-        : 0,
+    totalInterventions: 0,
+    improvedCases: 0,
+    avgImprovement: 0,
   });
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
@@ -56,11 +58,11 @@ export default function InterventionMonitoring() {
 
           setApiError('');
         } else if (!cancelled) {
-          setApiError(json?.message || 'Unable to load interventions. Showing fallback data.');
+          setApiError(json?.message || 'Unable to load interventions.');
         }
       } catch {
         if (!cancelled) {
-          setApiError('Unable to load interventions. Showing fallback data.');
+          setApiError('Unable to load interventions.');
         }
       } finally {
         if (!cancelled) {

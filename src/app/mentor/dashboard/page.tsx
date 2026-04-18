@@ -19,33 +19,6 @@ interface DashboardData {
   recentActions: ActionItem[];
 }
 
-// ─── Dummy Data ───────────────────────────────────────────
-
-const DUMMY: DashboardData = {
-  mentor: { name: 'Dr. Rajesh Kumar', department: 'Computer Engineering' },
-  summary: { totalStudents: 12, low: 3, medium: 3, high: 6, unreadAlerts: 5 },
-  students: [
-    { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', riskScore: 82, riskLevel: 'high' },
-    { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', riskScore: 78, riskLevel: 'high' },
-    { id: '3', name: 'Arjun Mehta', studentId: '22CE001', batch: 'CE-A', riskScore: 68, riskLevel: 'high' },
-    { id: '4', name: 'Hinal Bhatt', studentId: '22CE008', batch: 'CE-A', riskScore: 62, riskLevel: 'high' },
-    { id: '5', name: 'Raj Thakkar', studentId: '22CE016', batch: 'CE-B', riskScore: 58, riskLevel: 'high' },
-    { id: '6', name: 'Manish Kumar', studentId: '22CE009', batch: 'CE-A', riskScore: 55, riskLevel: 'high' },
-  ],
-  recentAlerts: [
-    { id: 'a1', studentName: 'Amit Joshi', title: 'Amit Joshi — Risk Level Elevated', message: 'Attendance at 38% and marks below average. Immediate intervention recommended.', priority: 'high', status: 'unread', sentAt: '2026-04-16T10:00:00Z' },
-    { id: 'a2', studentName: 'Pooja Verma', title: 'Pooja Verma — Missing Assignments', message: 'Has not submitted 5 out of 9 assignments. Please follow up.', priority: 'medium', status: 'unread', sentAt: '2026-04-15T10:00:00Z' },
-    { id: 'a3', studentName: 'Arjun Mehta', title: 'Arjun Mehta — Attendance Defaulter', message: 'Attendance dropped to 45%. Below the 75% threshold across all subjects.', priority: 'high', status: 'unread', sentAt: '2026-04-14T10:00:00Z' },
-    { id: 'a4', studentName: 'Hinal Bhatt', title: 'Hinal Bhatt — Low Internal Marks', message: 'Scoring below 30% in Data Structures and Operating Systems.', priority: 'medium', status: 'acknowledged', sentAt: '2026-04-12T10:00:00Z' },
-  ],
-  recentActions: [
-    { id: 'ac1', studentName: 'Arjun Mehta', actionType: 'counseling', description: 'One-on-one counseling session to discuss attendance and academic performance.', date: '2026-04-08T10:00:00Z', status: 'completed' },
-    { id: 'ac2', studentName: 'Amit Joshi', actionType: 'extra_class', description: 'Arranged extra Data Structures tutorial to help with fundamentals.', date: '2026-04-13T10:00:00Z', status: 'scheduled' },
-    { id: 'ac3', studentName: 'Pooja Verma', actionType: 'parent_meeting', description: 'Scheduled parent meeting to discuss high-risk academic performance.', date: '2026-04-20T10:00:00Z', status: 'scheduled' },
-    { id: 'ac4', studentName: 'Hinal Bhatt', actionType: 'academic_support', description: 'Assigned peer mentor for OS and Math subjects.', date: '2026-04-04T10:00:00Z', status: 'completed' },
-  ],
-};
-
 // ─── Helpers ──────────────────────────────────────────────
 
 const RISK_CFG: Record<string, { bg: string; text: string; border: string }> = {
@@ -92,22 +65,26 @@ function Topbar({ title, subtitle, unread }: { title: string; subtitle?: string;
 export default function MentorDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
       try {
-        const stored = localStorage.getItem('shikshasetu_user');
-        if (stored) {
-          const res = await fetch('/api/mentor/dashboard');
-          const json = await res.json();
-          if (res.ok && json.data && json.data.summary?.totalStudents > 0) {
-            setData(json.data); setLoading(false); return;
-          }
+        const res = await fetch('/api/mentor/dashboard', { cache: 'no-store' });
+        const json = await res.json();
+        if (res.ok && json?.success && json?.data) {
+          setData(json.data);
+          setError('');
+          return;
         }
-      } catch { /* fallback to dummy */ }
-      setData(DUMMY); setLoading(false);
+        setError(json?.message || 'Unable to load mentor dashboard data.');
+      } catch {
+        setError('Unable to load mentor dashboard data.');
+      } finally {
+        setLoading(false);
+      }
     }
-    load();
+    void load();
   }, []);
 
   if (loading) return (
@@ -116,7 +93,16 @@ export default function MentorDashboard() {
     </div>
   );
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-sm font-bold text-gray-900">Mentor dashboard unavailable</p>
+          <p className="text-xs font-medium text-gray-500 mt-1">{error || 'Please refresh to retry.'}</p>
+        </div>
+      </div>
+    );
+  }
   const { mentor, summary, students, recentAlerts, recentActions } = data;
   const highRiskStudents = students.filter(s => s.riskLevel === 'high');
 
@@ -125,6 +111,11 @@ export default function MentorDashboard() {
       <Topbar title="Mentor Dashboard" subtitle={`Welcome back, ${mentor.name} • ${mentor.department}`} unread={summary.unreadAlerts} />
 
       <main className="flex-1 p-8 space-y-8 overflow-auto max-w-7xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-xs font-semibold">
+            {error}
+          </div>
+        )}
         
         {/* ── Summary Metrics ── */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

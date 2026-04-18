@@ -1,13 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  MOCK_STUDENTS,
-  getSystemAggregates,
-  type RiskLevel,
-  type StudentRecord,
-} from '@/src/lib/coordinatorData';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
+
+type RiskLevel = 'Low' | 'Medium' | 'High';
+
+interface StudentRecord {
+  id: string;
+  name: string;
+  department: string;
+  classBatch: string;
+  attendance: number;
+  avgMarks: number;
+  riskScore: number;
+  riskLevel: RiskLevel;
+}
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -35,21 +42,6 @@ interface ReportsPayload {
   generatedAt: string;
 }
 
-function buildFallbackReports(): ReportsPayload {
-  const { total, atRisk, riskDist } = getSystemAggregates();
-  const topRiskStudents = MOCK_STUDENTS
-    .filter((student) => student.riskLevel === 'High')
-    .sort((a, b) => a.riskScore - b.riskScore)
-    .slice(0, 5);
-
-  return {
-    summary: { total, atRisk, riskDist },
-    students: MOCK_STUDENTS,
-    topRiskStudents,
-    generatedAt: new Date().toISOString(),
-  };
-}
-
 function csvEscape(value: string | number): string {
   const raw = String(value);
   if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
@@ -59,9 +51,17 @@ function csvEscape(value: string | number): string {
 }
 
 export default function ReportsPage() {
-  const [data, setData] = useState<ReportsPayload>(() => buildFallbackReports());
+  const [data, setData] = useState<ReportsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
+
+  const printableDate = useMemo(() => {
+    const parsed = new Date(data?.generatedAt ?? '');
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toLocaleDateString('en-GB');
+    }
+    return parsed.toLocaleDateString('en-GB');
+  }, [data?.generatedAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,14 +72,13 @@ export default function ReportsPage() {
         const json = await response.json();
 
         if (!cancelled && response.ok && json?.success && json?.data) {
-          const fallback = buildFallbackReports();
-          const summary = json.data.summary || fallback.summary;
+          const summary = json.data.summary;
           const students = Array.isArray(json.data.students)
             ? (json.data.students as StudentRecord[])
-            : fallback.students;
+            : [];
           const topRiskStudents = Array.isArray(json.data.topRiskStudents)
             ? (json.data.topRiskStudents as StudentRecord[])
-            : fallback.topRiskStudents;
+            : [];
 
           setData({
             summary: {
@@ -98,11 +97,11 @@ export default function ReportsPage() {
 
           setApiError('');
         } else if (!cancelled) {
-          setApiError(json?.message || 'Unable to load report data. Showing fallback dataset.');
+          setApiError(json?.message || 'Unable to load report data.');
         }
       } catch {
         if (!cancelled) {
-          setApiError('Unable to load report data. Showing fallback dataset.');
+          setApiError('Unable to load report data.');
         }
       } finally {
         if (!cancelled) {
@@ -117,15 +116,20 @@ export default function ReportsPage() {
     };
   }, []);
 
-  const { summary, students, topRiskStudents, generatedAt } = data;
+  if (!data) {
+    return (
+      <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-y-auto">
+        <Topbar title="Generate Reports" subtitle="Export analytical breakdown datasets for local offline review" />
+        <main className="flex-1 p-8 max-w-5xl w-full mx-auto">
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {apiError || 'Reports data unavailable.'}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-  const printableDate = useMemo(() => {
-    const parsed = new Date(generatedAt);
-    if (Number.isNaN(parsed.getTime())) {
-      return new Date().toLocaleDateString('en-GB');
-    }
-    return parsed.toLocaleDateString('en-GB');
-  }, [generatedAt]);
+  const { summary, students, topRiskStudents } = data;
 
   const handleDownloadCSV = () => {
     const headers = ['ID,Name,Department,Class,Attendance%,AvgMarks,RiskScore,RiskLevel'];

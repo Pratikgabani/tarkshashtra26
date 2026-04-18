@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { SUBJECT_PERFORMANCE, SUBJECT_DETAILS } from '@/src/lib/studentData';
+import { fetchStudentDashboardData, type StudentDashboardData, type StudentSubjectPerformance, toUiRiskLevel } from '@/src/lib/studentDashboardClient';
 import { BookOpen, GraduationCap, FileText } from 'lucide-react';
 
 type AssignmentStatus = 'On Time' | 'Late' | 'Missing' | 'Pending';
@@ -13,6 +13,26 @@ const STATUS_COLORS: Record<AssignmentStatus, string> = {
   Missing: 'bg-red-50 text-red-700 border-red-200',
   Pending: 'bg-gray-50 text-gray-600 border-gray-200',
 };
+
+function getSubjectScore(subject: StudentSubjectPerformance): number {
+  const weighted = subject.attendance * 0.3 + subject.marksPercent * 0.5 + subject.completionRate * 0.2;
+  return Math.round(weighted);
+}
+
+function assessmentLabel(type: string): string {
+  if (type === 'unit_test_1') return 'Unit Test 1';
+  if (type === 'unit_test_2') return 'Unit Test 2';
+  if (type === 'midterm') return 'Midterm';
+  if (type === 'endterm') return 'Endterm';
+  return type;
+}
+
+function assignmentStatusLabel(status: string): AssignmentStatus {
+  if (status === 'submitted_on_time') return 'On Time';
+  if (status === 'submitted_late') return 'Late';
+  if (status === 'not_submitted') return 'Missing';
+  return 'Pending';
+}
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -27,18 +47,76 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 
 function SubjectsContent() {
   const searchParams = useSearchParams();
-  const initialSubject = searchParams?.get('id') || SUBJECT_PERFORMANCE[0].id;
+  const initialSubject = searchParams?.get('id') || '';
   const [activeSubjectId, setActiveSubjectId] = useState(initialSubject);
+  const [data, setData] = useState<StudentDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const activeSubject = SUBJECT_PERFORMANCE.find(s => s.id === activeSubjectId) || SUBJECT_PERFORMANCE[0];
-  // Normally, fetch SUBJECT_DETAILS[activeSubjectId], using the DS mock for all right now if not DS
-  const details = activeSubjectId === 'DS' ? SUBJECT_DETAILS.DS : {
-    ...SUBJECT_DETAILS.DS,
-    name: activeSubject.name,
-    faculty: activeSubject.faculty,
-    riskLevel: activeSubject.riskLevel,
-    score: activeSubject.marks.obtained * 2.5, // fake calculation
-  };
+  useEffect(() => {
+    async function loadSubjects() {
+      const result = await fetchStudentDashboardData();
+      if (result.ok) {
+        setData(result.data);
+        setError('');
+        setActiveSubjectId((current) => {
+          if (current) return current;
+          if (initialSubject) return initialSubject;
+          return result.data.subjectPerformance[0]?.subjectId || '';
+        });
+      } else {
+        setError(result.message);
+      }
+      setLoading(false);
+    }
+
+    void loadSubjects();
+  }, [initialSubject]);
+
+  const subjects = data?.subjectPerformance || [];
+  const activeSubject = subjects.find((subject) => subject.subjectId === activeSubjectId) || subjects[0];
+
+  const details = useMemo(() => {
+    if (!activeSubject) return null;
+
+    const score = getSubjectScore(activeSubject);
+    const riskLevel = toUiRiskLevel(activeSubject.marksPercent < 40 || activeSubject.attendance < 60 ? 'high' : activeSubject.marksPercent < 55 || activeSubject.attendance < 75 ? 'medium' : 'low');
+
+    return {
+      ...activeSubject,
+      score,
+      riskLevel,
+      summary:
+        riskLevel === 'High'
+          ? 'This subject needs immediate attention. Improve attendance and assignment completion first.'
+          : riskLevel === 'Medium'
+          ? 'This subject is stable but has warning signs. Consistent effort can quickly improve outcomes.'
+          : 'Performance in this subject is currently healthy. Maintain consistency to keep this level.',
+    };
+  }, [activeSubject]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col flex-1 h-full overflow-hidden">
+        <Topbar title="Subject Performance" subtitle="Detailed breakdown of your academic progress by subject" />
+        <div className="flex flex-1 items-center justify-center text-sm font-medium text-gray-500">Loading subject details...</div>
+      </div>
+    );
+  }
+
+  if (!data || !details) {
+    return (
+      <div className="flex flex-col flex-1 h-full overflow-hidden">
+        <Topbar title="Subject Performance" subtitle="Detailed breakdown of your academic progress by subject" />
+        <div className="flex flex-1 items-center justify-center text-center px-8">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Subject data unavailable</p>
+            <p className="text-xs text-gray-500 mt-1">{error || 'Please refresh to retry.'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden">
@@ -49,27 +127,27 @@ function SubjectsContent() {
         {/* Left Sidebar: Subject List */}
         <div className="w-80 border-r border-gray-200 bg-gray-50/50 flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 border-b border-gray-200 shrink-0">
-            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enrolled Subjects ({SUBJECT_PERFORMANCE.length})</h2>
+            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enrolled Subjects ({subjects.length})</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {SUBJECT_PERFORMANCE.map(s => {
-              const isActive = s.id === activeSubjectId;
+            {subjects.map((subject) => {
+              const isActive = subject.subjectId === activeSubjectId;
               return (
                 <button
-                  key={s.id}
-                  onClick={() => setActiveSubjectId(s.id)}
+                  key={subject.subjectId}
+                  onClick={() => setActiveSubjectId(subject.subjectId)}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
                     isActive ? 'bg-white border-blue-500 shadow-md ring-1 ring-blue-500' : 'bg-white border-gray-200 shadow-sm hover:border-gray-300'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className={`text-sm font-bold ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>{s.name}</h3>
+                    <h3 className={`text-sm font-bold ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>{subject.name}</h3>
                   </div>
-                  <p className="text-[11px] font-medium text-gray-500 mb-4">{s.faculty}</p>
+                  <p className="text-[11px] font-medium text-gray-500 mb-4">{subject.faculty}</p>
                   
                   <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
-                    <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-gray-400"/> {s.marks.label}</span>
-                    <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-gray-400"/> {s.assignments.completed}/{s.assignments.total}</span>
+                    <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-gray-400"/> {subject.marksPercent}% marks</span>
+                    <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-gray-400"/> {subject.completionRate}% tasks</span>
                   </div>
                 </button>
               );
@@ -117,15 +195,15 @@ function SubjectsContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {details.assessments.map((a, i) => {
-                        const isLow = (a.obtained / a.max) < 0.4;
+                      {details.assessments.map((assessment, i) => {
+                        const isLow = (assessment.marksObtained / assessment.maxMarks) < 0.4;
                         return (
                           <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-4 py-4 text-sm font-bold text-gray-900">{a.name}</td>
-                            <td className="px-4 py-4 text-xs font-medium text-gray-500" suppressHydrationWarning>{new Date(a.date).toLocaleDateString('en-GB')}</td>
+                            <td className="px-4 py-4 text-sm font-bold text-gray-900">{assessmentLabel(assessment.type)}</td>
+                            <td className="px-4 py-4 text-xs font-medium text-gray-500" suppressHydrationWarning>{new Date(assessment.date).toLocaleDateString('en-GB')}</td>
                             <td className="px-4 py-4 text-sm font-black text-right">
-                              <span className={isLow ? 'text-red-600' : 'text-gray-900'}>{a.obtained}</span>
-                              <span className="text-gray-400 font-bold ml-1">/ {a.max}</span>
+                              <span className={isLow ? 'text-red-600' : 'text-gray-900'}>{assessment.marksObtained}</span>
+                              <span className="text-gray-400 font-bold ml-1">/ {assessment.maxMarks}</span>
                             </td>
                           </tr>
                         );
@@ -150,22 +228,22 @@ function SubjectsContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {details.assignments.map((a, i) => {
-                        const status = a.status as AssignmentStatus;
+                      {details.assignments.map((assignment, i) => {
+                        const status = assignmentStatusLabel(assignment.status);
                         const statusColor = STATUS_COLORS[status] || STATUS_COLORS.Pending;
                         return (
                           <tr key={i} className="hover:bg-gray-50">
                             <td className="px-4 py-4">
-                              <p className="text-sm font-bold text-gray-900">{a.name}</p>
-                              <p className="text-xs font-medium text-gray-500 mt-0.5" suppressHydrationWarning>Due {new Date(a.dueDate).toLocaleDateString('en-GB')}</p>
+                              <p className="text-sm font-bold text-gray-900">{assignment.title}</p>
+                              <p className="text-xs font-medium text-gray-500 mt-0.5" suppressHydrationWarning>Due {new Date(assignment.dueDate).toLocaleDateString('en-GB')}</p>
                             </td>
                             <td className="px-4 py-4">
                               <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${statusColor}`}>
-                                {a.status}
+                                {status}
                               </span>
                             </td>
                             <td className="px-4 py-4 text-sm font-black text-right text-gray-900">
-                              {a.marks ?? '--'}<span className="text-gray-400 font-bold ml-1">/ {a.max}</span>
+                              {assignment.marksObtained ?? '--'}<span className="text-gray-400 font-bold ml-1">/ {assignment.maxMarks}</span>
                             </td>
                           </tr>
                         );

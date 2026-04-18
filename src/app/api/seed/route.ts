@@ -332,7 +332,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: "Mock data seeded successfully",
+      message: "Database seed completed successfully",
       data: {
         studentEmail: "sujal@college.edu",
         studentPassword: "password123",

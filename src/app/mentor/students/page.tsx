@@ -9,22 +9,6 @@ const StudentDetailModal = dynamic(() => import('@/src/components/mentor/Student
 // ─── Types ────────────────────────────────────────────────
 interface StudentRow { id: string; name: string; studentId: string; batch: string; semester: number; attendance: number; marks: number; riskScore: number; riskLevel: string; }
 
-// ─── Dummy Data ───────────────────────────────────────────
-const DUMMY_STUDENTS: StudentRow[] = [
-  { id: '1', name: 'Amit Joshi', studentId: '22CE005', batch: 'CE-A', semester: 3, attendance: 38, marks: 22, riskScore: 82, riskLevel: 'high' },
-  { id: '2', name: 'Pooja Verma', studentId: '22CE010', batch: 'CE-A', semester: 3, attendance: 35, marks: 18, riskScore: 78, riskLevel: 'high' },
-  { id: '3', name: 'Arjun Mehta', studentId: '22CE001', batch: 'CE-A', semester: 3, attendance: 45, marks: 28, riskScore: 68, riskLevel: 'high' },
-  { id: '4', name: 'Hinal Bhatt', studentId: '22CE008', batch: 'CE-A', semester: 3, attendance: 50, marks: 32, riskScore: 62, riskLevel: 'high' },
-  { id: '5', name: 'Raj Thakkar', studentId: '22CE016', batch: 'CE-B', semester: 3, attendance: 55, marks: 30, riskScore: 58, riskLevel: 'high' },
-  { id: '6', name: 'Manish Kumar', studentId: '22CE009', batch: 'CE-A', semester: 3, attendance: 52, marks: 35, riskScore: 55, riskLevel: 'high' },
-  { id: '7', name: 'Kavita Rao', studentId: '22CE006', batch: 'CE-A', semester: 3, attendance: 65, marks: 42, riskScore: 45, riskLevel: 'medium' },
-  { id: '8', name: 'Nishu Gupta', studentId: '22CE012', batch: 'CE-B', semester: 3, attendance: 72, marks: 48, riskScore: 40, riskLevel: 'medium' },
-  { id: '9', name: 'Anisha Reddy', studentId: '22CE019', batch: 'CE-B', semester: 3, attendance: 68, marks: 45, riskScore: 38, riskLevel: 'medium' },
-  { id: '10', name: 'Priya Sharma', studentId: '22CE002', batch: 'CE-A', semester: 3, attendance: 88, marks: 72, riskScore: 18, riskLevel: 'low' },
-  { id: '11', name: 'Sneha Patel', studentId: '22CE004', batch: 'CE-A', semester: 3, attendance: 95, marks: 85, riskScore: 10, riskLevel: 'low' },
-  { id: '12', name: 'Dev Nair', studentId: '22CE007', batch: 'CE-A', semester: 3, attendance: 92, marks: 78, riskScore: 12, riskLevel: 'low' },
-];
-
 const RISK_CFG: Record<string, { bg: string; text: string; border: string }> = {
   low:      { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   medium:   { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
@@ -55,6 +39,7 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string; }) {
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
@@ -67,18 +52,21 @@ export default function StudentsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const stored = localStorage.getItem('shikshasetu_user');
-        if (stored) {
-          const res = await fetch('/api/mentor/students');
-          const json = await res.json();
-          if (res.ok && json.data && json.data.length > 0) {
-            setStudents(json.data); setLoading(false); return;
-          }
+        const res = await fetch('/api/mentor/students', { cache: 'no-store' });
+        const json = await res.json();
+        if (res.ok && json?.success && Array.isArray(json.data)) {
+          setStudents(json.data);
+          setError('');
+          return;
         }
-      } catch { /* fallback */ }
-      setStudents(DUMMY_STUDENTS); setLoading(false);
+        setError(json?.message || 'Unable to load assigned students.');
+      } catch {
+        setError('Unable to load assigned students.');
+      } finally {
+        setLoading(false);
+      }
     }
-    load();
+    void load();
   }, []);
 
   let filtered = students;
@@ -92,6 +80,11 @@ export default function StudentsPage() {
       <Topbar title="Assigned Students" subtitle="Manage and monitor risk profiles of all assigned students." />
 
       <main className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-xs font-semibold">
+            {error}
+          </div>
+        )}
         
         {/* Filters */}
         <div className="bg-white border text-sm border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">

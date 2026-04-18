@@ -11,8 +11,119 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import LmsActivity from "@/src/models/lmsActivity";
 import RiskScore from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
+import MentorAction from "@/src/models/mentorAction";
+
+type RiskLevel = "low" | "medium" | "high";
 
 type SubmissionStatus = "submitted_on_time" | "submitted_late" | "not_submitted";
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function deriveRiskLevel(score: number): RiskLevel {
+  if (score <= 25) return "low";
+  if (score <= 50) return "medium";
+  return "high";
+}
+
+function buildComputedRiskPayload(input: {
+  studentId: string;
+  overallAttendance: number;
+  overallMarksPercent: number;
+  assignmentCompletionRate: number;
+  avgLoginsPerWeek: number;
+  lateSubmissions: number;
+}) {
+  const attendanceDeficit = Math.max(0, (75 - input.overallAttendance) / 75);
+  const marksDeficit = Math.max(0, (40 - input.overallMarksPercent) / 40);
+  const assignmentDeficit = Math.max(0, (80 - input.assignmentCompletionRate) / 80);
+  const lmsDeficit = Math.max(0, (3 - input.avgLoginsPerWeek) / 3);
+  const latenessDeficit = Math.min(1, input.lateSubmissions / 5);
+
+  const weightedScore =
+    attendanceDeficit * 0.3 +
+    marksDeficit * 0.25 +
+    assignmentDeficit * 0.2 +
+    lmsDeficit * 0.15 +
+    latenessDeficit * 0.1;
+
+  const score = clampScore(weightedScore * 100);
+
+  return {
+    studentId: input.studentId,
+    score,
+    riskLevel: deriveRiskLevel(score),
+    factors: [
+      {
+        factor: "attendance",
+        label: "Attendance",
+        currentValue: input.overallAttendance,
+        threshold: 75,
+        unit: "%",
+        weight: 0.3,
+        contribution: Math.round(attendanceDeficit * 30),
+        suggestion:
+          input.overallAttendance < 75
+            ? "Your attendance is below 75%. Prioritize class presence this week."
+            : "Attendance is on track. Maintain consistency.",
+      },
+      {
+        factor: "assessment_marks",
+        label: "Internal Assessment Marks",
+        currentValue: input.overallMarksPercent,
+        threshold: 40,
+        unit: "%",
+        weight: 0.25,
+        contribution: Math.round(marksDeficit * 25),
+        suggestion:
+          input.overallMarksPercent < 40
+            ? "Assessment performance is below the pass threshold. Focus on weak subjects."
+            : "Assessment scores are stable. Keep revising consistently.",
+      },
+      {
+        factor: "assignment_completion",
+        label: "Assignment Completion",
+        currentValue: input.assignmentCompletionRate,
+        threshold: 80,
+        unit: "%",
+        weight: 0.2,
+        contribution: Math.round(assignmentDeficit * 20),
+        suggestion:
+          input.assignmentCompletionRate < 80
+            ? "Assignment completion is low. Finish pending work before deadlines."
+            : "Assignment completion is healthy.",
+      },
+      {
+        factor: "lms_activity",
+        label: "LMS Activity",
+        currentValue: input.avgLoginsPerWeek,
+        threshold: 3,
+        unit: "logins/week",
+        weight: 0.15,
+        contribution: Math.round(lmsDeficit * 15),
+        suggestion:
+          input.avgLoginsPerWeek < 3
+            ? "Increase LMS usage for notes, assignments, and announcements."
+            : "LMS engagement is good.",
+      },
+      {
+        factor: "submission_timeliness",
+        label: "Submission Timeliness",
+        currentValue: input.lateSubmissions,
+        threshold: 2,
+        unit: "late submissions",
+        weight: 0.1,
+        contribution: Math.round(latenessDeficit * 10),
+        suggestion:
+          input.lateSubmissions > 2
+            ? "Frequent late submissions are hurting your risk profile. Plan early submissions."
+            : "Submission timing is acceptable.",
+      },
+    ],
+    calculatedAt: new Date().toISOString(),
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,6 +171,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const mentor = student.assignedMentorId
+      ? await User.findById(student.assignedMentorId)
+          .select("_id fullName email role")
+          .lean()
+      : null;
+
     // --- Fetch subjects for the student's semester & department ---
     const subjects = await Subject.find({
       department: student.department,
@@ -68,6 +185,24 @@ export async function GET(request: NextRequest) {
 
     const subjectIds = subjects.map((s) => s._id);
     const subjectNameById = new Map(subjects.map((s) => [s._id.toString(), s.name]));
+
+    const teacherIds = Array.from(
+      new Set(
+        subjects
+          .map((subject) => subject.teacherId?.toString())
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const teacherDocs = teacherIds.length > 0
+      ? await User.find({ _id: { $in: teacherIds }, role: "teacher" })
+          .select("_id fullName email")
+          .lean()
+      : [];
+
+    const teacherById = new Map(
+      teacherDocs.map((teacher) => [teacher._id.toString(), teacher])
+    );
 
     // --- Attendance per subject ---
     const attendance = await Attendance.find({
@@ -224,40 +359,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (!riskData) {
-      const internalApiBaseUrl = process.env.APP_BASE_URL?.trim();
-
-      if (internalApiBaseUrl) {
-        try {
-          const normalizedBaseUrl = internalApiBaseUrl.endsWith("/")
-            ? internalApiBaseUrl.slice(0, -1)
-            : internalApiBaseUrl;
-
-          const riskRes = await fetch(`${normalizedBaseUrl}/api/risk-score`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ studentId }),
-          });
-
-          if (riskRes.ok) {
-            const riskJson = (await riskRes.json()) as { data?: typeof riskData };
-            if (riskJson.data) {
-              riskData = riskJson.data;
-            }
-          }
-        } catch (error) {
-          console.error("Risk score fetch error:", error);
-        }
-      }
-    }
-
-    if (!riskData) {
-      riskData = {
+      riskData = buildComputedRiskPayload({
         studentId,
-        score: 0,
-        riskLevel: "low",
-        factors: [],
-        calculatedAt: new Date().toISOString(),
-      };
+        overallAttendance,
+        overallMarksPercent,
+        assignmentCompletionRate,
+        avgLoginsPerWeek,
+        lateSubmissions,
+      });
     }
 
     // --- Risk History ---
@@ -265,11 +374,21 @@ export async function GET(request: NextRequest) {
       .sort({ calculatedAt: 1 })
       .lean();
 
+    const interventionActions = await MentorAction.find({ studentId: student._id })
+      .select("date")
+      .lean();
+
+    const interventionDays = new Set(
+      interventionActions.map((action) => new Date(action.date).toISOString().slice(0, 10))
+    );
+
     // --- Alerts ---
     const alerts = await Alert.find({ studentId: student._id })
       .sort({ sentAt: -1 })
       .limit(10)
       .lean();
+
+    const unreadAlertCount = alerts.filter((alert) => alert.status === "unread").length;
 
     // --- Build subject performance cards ---
     const subjectPerformance = subjects.map((subject) => {
@@ -293,6 +412,7 @@ export async function GET(request: NextRequest) {
         subjectId: sid,
         name: subject.name,
         code: subject.code,
+        faculty: teacherById.get(subject.teacherId?.toString() || "")?.fullName || "Faculty Not Assigned",
         attendance: attPercent,
         marksPercent,
         completionRate,
@@ -308,9 +428,7 @@ export async function GET(request: NextRequest) {
         ? "Great work! Keep maintaining your performance."
         : riskLevel === "medium"
         ? "You're doing okay, but there's room for improvement. Stay focused!"
-        : riskLevel === "high"
-        ? "You have the ability to improve. Focus on attendance and pending assignments first."
-        : "Immediate action required. Reach out to your mentor for support.";
+        : "You have the ability to improve. Focus on attendance and pending assignments first.";
 
     return NextResponse.json({
       success: true,
@@ -323,6 +441,13 @@ export async function GET(request: NextRequest) {
           department: student.department,
           semester: student.semester,
           batch: student.batch,
+          mentor: student.assignedMentorId
+            ? {
+                id: student.assignedMentorId,
+                fullName: mentor?.fullName || "Mentor",
+                email: mentor?.email || "",
+              }
+            : null,
         },
         riskScore: riskData,
         motivationalMessage,
@@ -341,6 +466,7 @@ export async function GET(request: NextRequest) {
           score: r.score,
           riskLevel: r.riskLevel,
           date: r.calculatedAt.toISOString(),
+          intervention: interventionDays.has(r.calculatedAt.toISOString().slice(0, 10)),
         })),
         alerts: alerts.map((a) => ({
           id: a._id.toString(),
@@ -352,6 +478,8 @@ export async function GET(request: NextRequest) {
           sentAt: a.sentAt.toISOString(),
           actionLink: a.actionLink,
         })),
+        unreadAlertCount,
+        generatedAt: new Date().toISOString(),
       },
     });
   } catch (error) {

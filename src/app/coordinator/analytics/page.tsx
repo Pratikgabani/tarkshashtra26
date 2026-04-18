@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSystemAggregates, CLASSES } from '@/src/lib/coordinatorData';
 import { Lightbulb, TrendingDown, Target, Building2, BookOpen } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -40,44 +39,6 @@ interface AnalyticsPayload {
   }>;
 }
 
-function buildFallbackAnalytics(): AnalyticsPayload {
-  const { total, atRisk, deptStats } = getSystemAggregates();
-  const riskPercentage = total > 0 ? Math.round((atRisk / total) * 100) : 0;
-  const highestRiskDept = [...deptStats].sort((a, b) => b.riskRate - a.riskRate)[0];
-
-  return {
-    total,
-    atRisk,
-    riskPercentage,
-    deptStats,
-    classStats: CLASSES.map((classBatch, index) => {
-      const seed = classBatch.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-      return {
-        class: classBatch,
-        avgScore: 50 + ((seed * 13 + index * 7) % 30),
-        atRiskCount: (seed + index * 5) % 15,
-      };
-    }),
-    insights: [
-      {
-        type: 'Department',
-        text: `${highestRiskDept.department} has the highest risk concentration (${highestRiskDept.riskRate}% of students).`,
-        action: 'Discuss grading patterns with department faculty.',
-      },
-      {
-        type: 'Class',
-        text: 'ME-A has a clustered risk pattern with weak assignment completion trends.',
-        action: 'Run focused remedial planning for this class.',
-      },
-      {
-        type: 'Trend',
-        text: 'Overall attendance has dipped before internal assessments across multiple batches.',
-        action: 'Send attendance escalation alerts and counselor follow-ups.',
-      },
-    ],
-  };
-}
-
 function getInsightIcon(type: string) {
   if (type === 'Department') return Building2;
   if (type === 'Class') return BookOpen;
@@ -86,8 +47,9 @@ function getInsightIcon(type: string) {
 }
 
 export default function CoordinatorAnalytics() {
-  const [data, setData] = useState<AnalyticsPayload>(() => buildFallbackAnalytics());
+  const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -106,9 +68,14 @@ export default function CoordinatorAnalytics() {
             classStats: Array.isArray(json.data.classStats) ? json.data.classStats : [],
             insights: Array.isArray(json.data.insights) ? json.data.insights : [],
           });
+          setError('');
+        } else if (!cancelled) {
+          setError(json?.message || 'Unable to load analytics data.');
         }
       } catch {
-        // Keep fallback analytics payload.
+        if (!cancelled) {
+          setError('Unable to load analytics data.');
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -122,6 +89,19 @@ export default function CoordinatorAnalytics() {
     };
   }, []);
 
+  if (!data) {
+    return (
+      <div className="flex flex-col flex-1 bg-[#F9FAFB]">
+        <Topbar title="Aggregate Analytics & Patterns" subtitle="Automated insights and deep drill-downs into risk vectors" />
+        <main className="flex-1 p-8">
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {error || 'Analytics data unavailable.'}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const { riskPercentage, deptStats, classStats, insights } = data;
 
   return (
@@ -132,6 +112,11 @@ export default function CoordinatorAnalytics() {
         {loading && (
           <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
             Loading analytics from backend...
+          </div>
+        )}
+        {error && (
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {error}
           </div>
         )}
         

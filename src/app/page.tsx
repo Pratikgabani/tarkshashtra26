@@ -1,111 +1,44 @@
 import Link from "next/link";
 
-// ─── Risk Badge ──────────────────────────────────────────────────────────────
-function RiskBadge({ level }: { level: "Low" | "Medium" | "High" }) {
-  const styles = {
-    Low:      "bg-green-50 text-green-700 border border-green-200",
-    Medium:   "bg-yellow-50 text-yellow-700 border border-yellow-200",
-    High:     "bg-orange-50 text-orange-700 border border-orange-200",
-  };
-  const dots = {
-    Low: "bg-green-500", Medium: "bg-yellow-500",
-    High: "bg-orange-500",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold ${styles[level]}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dots[level]}`} />
-      {level}
-    </span>
-  );
-}
-
-// ─── Hero Mock Dashboard ──────────────────────────────────────────────────────
-function MockDashboard() {
-  const students = [
-    { name: "Arjun Mehta",    id: "CE2301", score: 82, level: "High" as const, attendance: "48%", pending: 4 },
-    { name: "Priya Sharma",   id: "CE2304", score: 67, level: "High"     as const, attendance: "61%", pending: 3 },
-    { name: "Rohan Desai",    id: "CE2309", score: 44, level: "Medium"   as const, attendance: "72%", pending: 1 },
-    { name: "Sneha Patel",    id: "CE2315", score: 18, level: "Low"      as const, attendance: "88%", pending: 0 },
-    { name: "Amit Joshi",     id: "CE2321", score: 76, level: "High" as const, attendance: "52%", pending: 5 },
-  ];
-
+function LiveDataPanel() {
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden text-sm">
-      {/* Dashboard header */}
-      <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-gray-800 text-xs">Faculty Mentor Dashboard</p>
-          <p className="text-gray-400 text-xs">Batch CE-A · Semester 3 · 32 Students</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" />
-          </span>
-        </div>
+      <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
+        <p className="font-semibold text-gray-800 text-xs">Live Data Pipeline</p>
+        <p className="text-gray-400 text-xs">All dashboard views load from MongoDB-backed APIs</p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
-        {[
-          { label: "Total Mentees", value: "32", color: "text-gray-800" },
-          { label: "At Risk",       value: "14", color: "text-orange-600" },
-          { label: "High Risk",     value: "5",  color: "text-red-600" },
-          { label: "Interventions", value: "3",  color: "text-blue-600" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white px-3 py-2.5">
-            <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-gray-400 text-xs mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50">
-        {["All Classes", "High Risk ↓", "Semester 3"].map((f) => (
-          <span key={f} className="px-2 py-0.5 rounded border border-gray-200 bg-white text-gray-600 text-xs cursor-pointer">{f}</span>
-        ))}
-      </div>
-
-      {/* Table */}
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
-            <th className="px-4 py-2 text-left font-medium">Student</th>
-            <th className="px-3 py-2 text-left font-medium">Risk</th>
-            <th className="px-3 py-2 text-left font-medium">Score</th>
-            <th className="px-3 py-2 text-left font-medium">Attend.</th>
-            <th className="px-3 py-2 text-left font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((s, i) => (
-            <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50 ${i === 0 || i === 4 ? "bg-red-50/30" : ""}`}>
-              <td className="px-4 py-2.5">
-                <p className="font-medium text-gray-800 text-xs">{s.name}</p>
-                <p className="text-gray-400 text-xs">{s.id}</p>
-              </td>
-              <td className="px-3 py-2.5"><RiskBadge level={s.level} /></td>
-              <td className="px-3 py-2.5">
-                <span className={`font-bold text-xs ${s.score >= 76 ? "text-red-600" : s.score >= 51 ? "text-orange-600" : s.score >= 26 ? "text-yellow-600" : "text-green-600"}`}>
-                  {s.score}
-                </span>
-              </td>
-              <td className={`px-3 py-2.5 text-xs font-medium ${parseInt(s.attendance) < 75 ? "text-red-600" : "text-gray-700"}`}>
-                {s.attendance}
-              </td>
-              <td className="px-3 py-2.5">
-                <div className="flex gap-1">
-                  <button className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">View</button>
-                  <button className="px-1.5 py-0.5 rounded border border-gray-200 text-gray-600 text-xs hover:bg-gray-50">Log</button>
-                </div>
-              </td>
-            </tr>
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            "Attendance",
+            "Assessments",
+            "Assignments",
+            "LMS Activity",
+          ].map((source) => (
+            <div key={source} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+              <p className="text-[11px] font-semibold text-gray-700">{source}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Fetched in real time</p>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <p className="text-xs font-semibold text-blue-800">No hardcoded dashboard records</p>
+          <p className="text-[11px] text-blue-700 mt-1 leading-relaxed">
+            Mentors, students, teachers, and coordinators see records sourced from database APIs,
+            with empty/error states shown when data is unavailable.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 p-3">
+          <p className="text-[11px] font-semibold text-gray-800">Risk scoring flow</p>
+          <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+            Risk scores are calculated from attendance, marks, assignment completion, LMS engagement,
+            and submission timeliness when an external model is not configured.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -197,9 +130,9 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right — Mock Dashboard */}
+            {/* Right - Live Data Overview */}
             <div className="relative lg:pl-4">
-              <MockDashboard />
+              <LiveDataPanel />
               {/* Alert banner floating */}
               <div className="absolute -bottom-4 -left-4 bg-white border border-red-200 rounded-lg px-3 py-2 shadow-md flex items-start gap-2 max-w-xs">
                 <span className="text-red-500 mt-0.5">
@@ -208,8 +141,8 @@ export default function LandingPage() {
                   </svg>
                 </span>
                 <div>
-                    <p className="text-xs font-semibold text-gray-800">High-Risk Alert</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Arjun Mehta — Risk score crossed 76. Immediate intervention required.</p>
+                  <p className="text-xs font-semibold text-gray-800">High-Risk Alert</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Mentors are notified when a student enters high risk so intervention can begin immediately.</p>
                 </div>
               </div>
             </div>

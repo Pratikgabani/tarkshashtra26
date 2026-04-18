@@ -1,14 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  MOCK_STUDENTS,
-  DEPARTMENTS,
-  CLASSES,
-  type RiskLevel,
-  type StudentRecord,
-} from '@/src/lib/coordinatorData';
 import { Search, Filter } from 'lucide-react';
+
+type RiskLevel = 'Low' | 'Medium' | 'High';
+
+interface StudentRecord {
+  id: string;
+  name: string;
+  department: string;
+  classBatch: string;
+  attendance: number;
+  avgMarks: number;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  riskExplanation: string;
+}
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -39,9 +46,9 @@ export default function CoordinatorStudents() {
   const [filterDept, setFilterDept] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
   const [filterRisk, setFilterRisk] = useState('All');
-  const [students, setStudents] = useState<StudentRecord[]>(MOCK_STUDENTS);
-  const [departments, setDepartments] = useState<string[]>(DEPARTMENTS);
-  const [classes, setClasses] = useState<string[]>(CLASSES);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
 
@@ -71,20 +78,20 @@ export default function CoordinatorStudents() {
           setDepartments(
             Array.isArray(json.data.filters?.departments) && json.data.filters.departments.length > 0
               ? json.data.filters.departments
-              : DEPARTMENTS
+              : []
           );
           setClasses(
             Array.isArray(json.data.filters?.classes) && json.data.filters.classes.length > 0
               ? json.data.filters.classes
-              : CLASSES
+              : []
           );
           setApiError('');
         } else if (!cancelled) {
-          setApiError(json?.message || 'Unable to fetch live student records. Showing fallback data.');
+          setApiError(json?.message || 'Unable to fetch live student records.');
         }
       } catch {
         if (!cancelled) {
-          setApiError('Unable to fetch live student records. Showing fallback data.');
+          setApiError('Unable to fetch live student records.');
         }
       } finally {
         if (!cancelled) {

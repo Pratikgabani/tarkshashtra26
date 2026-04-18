@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSystemAggregates } from '@/src/lib/coordinatorData';
 import { Users, AlertTriangle, Activity, Briefcase } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
@@ -41,25 +40,10 @@ interface DashboardPayload {
   }>;
 }
 
-function buildFallbackData(): DashboardPayload {
-  const { total, atRisk, riskDist, deptStats } = getSystemAggregates();
-  return {
-    total,
-    atRisk,
-    riskDist,
-    deptStats,
-    trend: [
-      { month: 'Jan', atRisk: 42, total },
-      { month: 'Feb', atRisk: 38, total },
-      { month: 'Mar', atRisk: 45, total },
-      { month: 'Apr', atRisk, total },
-    ],
-  };
-}
-
 export default function CoordinatorDashboard() {
-  const [data, setData] = useState<DashboardPayload>(() => buildFallbackData());
+  const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -81,9 +65,14 @@ export default function CoordinatorDashboard() {
             deptStats: Array.isArray(json.data.deptStats) ? json.data.deptStats : [],
             trend: Array.isArray(json.data.trend) ? json.data.trend : [],
           });
+          setError('');
+        } else if (!cancelled) {
+          setError(json?.message || 'Unable to load coordinator dashboard.');
         }
       } catch {
-        // Keep fallback payload when backend is unavailable.
+        if (!cancelled) {
+          setError('Unable to load coordinator dashboard.');
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -97,6 +86,19 @@ export default function CoordinatorDashboard() {
     };
   }, []);
 
+  if (!data) {
+    return (
+      <div className="flex flex-col flex-1 bg-[#F9FAFB]">
+        <Topbar title="Institution Overview" subtitle="High-level pulse on academic performance blocks" />
+        <main className="flex-1 p-8">
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {error || 'Coordinator dashboard unavailable.'}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const { total, atRisk, riskDist, deptStats, trend } = data;
 
   const pieData = [
@@ -105,7 +107,7 @@ export default function CoordinatorDashboard() {
     { name: 'High Risk', value: riskDist.High, color: '#F97316' },
   ];
 
-  const trendData = trend.length > 0 ? trend : buildFallbackData().trend;
+  const trendData = trend;
 
   return (
     <div className="flex flex-col flex-1 bg-[#F9FAFB]">
@@ -115,6 +117,11 @@ export default function CoordinatorDashboard() {
         {loading && (
           <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
             Loading live coordinator data...
+          </div>
+        )}
+        {error && (
+          <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-lg p-3 text-xs font-semibold text-[#B91C1C]">
+            {error}
           </div>
         )}
         

@@ -4,14 +4,15 @@ import connectDB from "@/src/lib/DB_Connection";
 import User from "@/src/models/user";
 import RiskScore, { type IRiskFactor } from "@/src/models/riskScore";
 import Alert from "@/src/models/alert";
+import Attendance from "@/src/models/attendance";
+import Assessment from "@/src/models/assessment";
+import StudentAssignment from "@/src/models/studentAssignment";
+import LmsActivity from "@/src/models/lmsActivity";
 
 /**
- * Dummy Risk Score API
- * ----------------------------------------------------------
- * This endpoint is a placeholder. Replace the URL in
- * EXTERNAL_RISK_API_URL with the real ML model endpoint
- * once it is ready. The response contract stays the same.
- * ----------------------------------------------------------
+ * Risk score endpoint.
+ * Uses external model when configured; otherwise computes
+ * scores from live database signals.
  */
 
 const EXTERNAL_RISK_API_URL = process.env.EXTERNAL_RISK_API_URL?.trim() || "";
@@ -90,8 +91,53 @@ function normalizeRiskPayload(payload: unknown, studentId: string): RiskResponse
   };
 }
 
-function buildDummyPayload(studentId: string): RiskResponsePayload {
-  const score = 62;
+async function buildDatabasePayload(studentDbId: mongoose.Types.ObjectId, studentId: string): Promise<RiskResponsePayload> {
+  const [attendanceRecords, assessments, studentAssignments, recentLms] = await Promise.all([
+    Attendance.find({ studentId: studentDbId }).lean(),
+    Assessment.find({ studentId: studentDbId }).lean(),
+    StudentAssignment.find({ studentId: studentDbId }).lean(),
+    LmsActivity.find({
+      studentId: studentDbId,
+      date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+    }).lean(),
+  ]);
+
+  const totalClasses = attendanceRecords.length;
+  const presentClasses = attendanceRecords.filter(
+    (record) => record.status === "present" || record.status === "late"
+  ).length;
+  const attendancePercent = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
+
+  const totalObtained = assessments.reduce((sum, assessment) => sum + assessment.marksObtained, 0);
+  const totalMax = assessments.reduce((sum, assessment) => sum + assessment.maxMarks, 0);
+  const marksPercent = totalMax > 0 ? Math.round((totalObtained / totalMax) * 100) : 0;
+
+  const totalAssignments = studentAssignments.length;
+  const submittedAssignments = studentAssignments.filter(
+    (entry) => entry.status === "submitted_on_time" || entry.status === "submitted_late"
+  ).length;
+  const lateSubmissions = studentAssignments.filter((entry) => entry.status === "submitted_late").length;
+  const assignmentCompletionPercent =
+    totalAssignments > 0 ? Math.round((submittedAssignments / totalAssignments) * 100) : 0;
+
+  const weeklyLogins = recentLms.reduce((sum, activity) => sum + activity.loginCount, 0);
+  const avgLoginsPerWeek = Math.round(weeklyLogins * 10) / 10;
+
+  const attendanceDeficit = Math.max(0, (75 - attendancePercent) / 75);
+  const marksDeficit = Math.max(0, (40 - marksPercent) / 40);
+  const assignmentDeficit = Math.max(0, (80 - assignmentCompletionPercent) / 80);
+  const lmsDeficit = Math.max(0, (3 - avgLoginsPerWeek) / 3);
+  const latenessDeficit = Math.min(1, lateSubmissions / 5);
+
+  const weightedScore =
+    attendanceDeficit * 0.3 +
+    marksDeficit * 0.25 +
+    assignmentDeficit * 0.2 +
+    lmsDeficit * 0.15 +
+    latenessDeficit * 0.1;
+
+  const score = clampScore(weightedScore * 100);
+
   return {
     studentId,
     score,
@@ -100,52 +146,67 @@ function buildDummyPayload(studentId: string): RiskResponsePayload {
       {
         factor: "attendance",
         label: "Attendance",
-        currentValue: 58,
+        currentValue: attendancePercent,
         threshold: 75,
         unit: "%",
         weight: 0.3,
-        contribution: 34,
-        suggestion: "Attend at least 7 more classes this month to reach the 75% threshold.",
+        contribution: Math.round(attendanceDeficit * 30),
+        suggestion:
+          attendancePercent < 75
+            ? "Your attendance is below 75%. Increase class participation this week."
+            : "Attendance is healthy. Keep it consistent.",
       },
       {
         factor: "assessment_marks",
         label: "Internal Assessment Marks",
-        currentValue: 28,
+        currentValue: marksPercent,
         threshold: 40,
         unit: "%",
         weight: 0.25,
-        contribution: 25,
-        suggestion: "Your marks in Data Structures are below passing. Attend the next remedial session.",
+        contribution: Math.round(marksDeficit * 25),
+        suggestion:
+          marksPercent < 40
+            ? "Assessment marks are below passing threshold. Focus on weak subjects."
+            : "Assessment marks are on track.",
       },
       {
         factor: "assignment_completion",
         label: "Assignment Completion",
-        currentValue: 56,
-        threshold: 70,
+        currentValue: assignmentCompletionPercent,
+        threshold: 80,
         unit: "%",
         weight: 0.2,
-        contribution: 22,
-        suggestion: "You have 3 pending assignments. Submit them before the deadline to avoid penalties.",
+        contribution: Math.round(assignmentDeficit * 20),
+        suggestion:
+          assignmentCompletionPercent < 80
+            ? "Complete pending assignments to reduce your risk quickly."
+            : "Assignment completion is strong.",
       },
       {
         factor: "lms_activity",
         label: "LMS Activity",
-        currentValue: 1.5,
+        currentValue: avgLoginsPerWeek,
         threshold: 3,
         unit: "logins/week",
         weight: 0.15,
-        contribution: 13,
-        suggestion: "Login to the LMS at least 3 times this week and review materials for Data Structures.",
+        contribution: Math.round(lmsDeficit * 15),
+        suggestion:
+          avgLoginsPerWeek < 3
+            ? "Increase LMS usage for announcements and learning material."
+            : "LMS activity is good.",
       },
       {
         factor: "submission_timeliness",
         label: "Submission Timeliness",
-        currentValue: 3,
+        currentValue: lateSubmissions,
         threshold: 2,
         unit: "late submissions",
         weight: 0.1,
-        contribution: 6,
-        suggestion: "You have 3 late submissions. Contact your teacher to discuss deadline extensions.",
+        contribution: Math.round(latenessDeficit * 10),
+        suggestion:
+          lateSubmissions > 2
+            ? "Frequent late submissions increase academic risk. Submit earlier."
+            : "Submission timeliness is acceptable.",
       },
     ],
     calculatedAt: new Date().toISOString(),
@@ -175,7 +236,7 @@ export async function POST(request: NextRequest) {
     }
 
     let payload: RiskResponsePayload | null = null;
-    let source: "external" | "dummy" = "dummy";
+    let source: "external" | "database" = "database";
 
     // If a real external API is configured, call it
     if (EXTERNAL_RISK_API_URL) {
@@ -196,13 +257,13 @@ export async function POST(request: NextRequest) {
           source = "external";
         }
       } catch (err) {
-        console.error("External risk API failed, using dummy data:", err);
+        console.error("External risk API failed, using database scoring:", err);
       }
     }
 
     if (!payload) {
-      payload = buildDummyPayload(studentId);
-      source = "dummy";
+      payload = await buildDatabasePayload(student._id, studentId);
+      source = "database";
     }
 
     const previousRisk = await RiskScore.findOne({ studentId: student._id })

@@ -280,7 +280,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: "Mentor demo data seeded",
+      message: "Mentor seed data inserted",
       data: {
         mentorEmail: "mentor@college.edu",
         teacherEmail: "teacher@college.edu",

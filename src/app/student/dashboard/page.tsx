@@ -1,19 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { 
-  RISK_SCORE_DATA, 
-  OVERALL_STATS, 
-  SUBJECT_PERFORMANCE, 
-  PENDING_ASSIGNMENTS,
-  ALERTS,
-  RISK_HISTORY,
-  type RiskLevel 
-} from '@/src/lib/studentData';
+  fetchStudentDashboardData,
+  formatRelativeDate,
+  toUiRiskLevel,
+  type StudentDashboardData,
+  type StudentSubjectPerformance,
+  type UiRiskLevel,
+} from '@/src/lib/studentDashboardClient';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
-import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText } from 'lucide-react';
+import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText, LineChart as TrendChartIcon } from 'lucide-react';
 
 // ─── Reusable Topbar ────────────────────────────────────────────────────────
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -36,6 +43,8 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
 interface RiskHistoryItem {
   week: string;
   score: number;
+  date: string;
+  riskLevel: string;
   intervention?: boolean;
 }
 
@@ -88,7 +97,7 @@ function renderDashboardDot({ cx, cy, payload }: DotRenderProps) {
 }
 
 // ─── Risk Badge ─────────────────────────────────────────────────────────────
-function RiskBadge({ level }: { level: RiskLevel }) {
+function RiskBadge({ level }: { level: UiRiskLevel }) {
   const cfg = {
     Low:      'bg-emerald-50 text-emerald-700 border-emerald-200',
     Medium:   'bg-amber-50 text-amber-700 border-amber-200',
@@ -105,10 +114,73 @@ function RiskBadge({ level }: { level: RiskLevel }) {
   );
 }
 
+function getSubjectRiskLevel(subject: StudentSubjectPerformance): UiRiskLevel {
+  if (subject.attendance < 60 || subject.marksPercent < 40 || subject.completionRate < 60) return 'High';
+  if (subject.attendance < 75 || subject.marksPercent < 55 || subject.completionRate < 80) return 'Medium';
+  return 'Low';
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function StudentDashboard() {
+  const [data, setData] = useState<StudentDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadData() {
+      const result = await fetchStudentDashboardData();
+      if (result.ok) {
+        setData(result.data);
+        setError('');
+      } else {
+        setError(result.message);
+      }
+      setLoading(false);
+    }
+
+    void loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-sm font-bold text-gray-900">Student dashboard unavailable</p>
+          <p className="text-xs font-medium text-gray-500 mt-1">{error || 'Please refresh to retry.'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const riskHistory: RiskHistoryItem[] = useMemo(
+    () =>
+      data.riskHistory.map((point, index) => ({
+        ...point,
+        week:
+          new Date(point.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ||
+          `Point ${index + 1}`,
+      })),
+    [data.riskHistory]
+  );
+
+  const trendWorsening =
+    riskHistory.length > 1
+      ? riskHistory[riskHistory.length - 1].score > riskHistory[riskHistory.length - 2].score
+      : false;
+
+  const subjectPerformance = data.subjectPerformance;
+  const topFactors = data.riskScore.factors.slice(0, 5);
+
   // SVG Donut metrics
-  const score = RISK_SCORE_DATA.score;
+  const score = data.riskScore.score;
   const strokeDasharray = `${(score / 100) * 283} 283`;
   const strokeColor = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f97316';
 
@@ -117,6 +189,11 @@ export default function StudentDashboard() {
       <Topbar title="Overview" subtitle={`Review your analytical risk profile and performance.`} />
 
       <main className="flex-1 p-8 space-y-8 overflow-auto max-w-7xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-xs font-semibold">
+            {error}
+          </div>
+        )}
         
         {/* ── Top Section: Risk Score & Quick Stats ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -144,15 +221,15 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            <RiskBadge level={RISK_SCORE_DATA.level} />
+            <RiskBadge level={toUiRiskLevel(data.riskScore.riskLevel)} />
 
             <div className="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm font-medium text-gray-600">
-              {RISK_SCORE_DATA.message}
+              {data.motivationalMessage}
             </div>
 
             <div className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-gray-400">
-              {RISK_SCORE_DATA.trend === 'worsening' ? <TrendingDown className="w-4 h-4 text-orange-500" /> : <TrendingUp className="w-4 h-4 text-green-500" />}
-              <span suppressHydrationWarning>Updated {new Date(RISK_SCORE_DATA.calculatedAt).toLocaleDateString('en-GB')}</span>
+              {trendWorsening ? <TrendingDown className="w-4 h-4 text-orange-500" /> : <TrendingUp className="w-4 h-4 text-green-500" />}
+              <span suppressHydrationWarning>Updated {new Date(data.riskScore.calculatedAt).toLocaleDateString('en-GB')}</span>
             </div>
           </div>
 
@@ -162,10 +239,10 @@ export default function StudentDashboard() {
             {/* Quick Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Attendance', value: `${OVERALL_STATS.attendance}%`, warn: OVERALL_STATS.attendance < 75 },
-                { label: 'Assignments', value: `${OVERALL_STATS.assignmentCompletionRate}%`, warn: OVERALL_STATS.assignmentCompletionRate < 85 },
-                { label: 'Late Subs', value: OVERALL_STATS.lateSubmissions, warn: OVERALL_STATS.lateSubmissions > 1 },
-                { label: 'Pending', value: OVERALL_STATS.pendingAssignments, warn: OVERALL_STATS.pendingAssignments > 0 },
+                { label: 'Attendance', value: `${data.overallStats.attendance}%`, warn: data.overallStats.attendance < 75 },
+                { label: 'Assignments', value: `${data.overallStats.assignmentCompletionRate}%`, warn: data.overallStats.assignmentCompletionRate < 85 },
+                { label: 'Late Subs', value: data.overallStats.lateSubmissions, warn: data.overallStats.lateSubmissions > 1 },
+                { label: 'Pending', value: data.overallStats.pendingAssignments, warn: data.overallStats.pendingAssignments > 0 },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col justify-center">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{s.label}</p>
@@ -187,11 +264,12 @@ export default function StudentDashboard() {
               </div>
 
               <div className="space-y-5">
-                {RISK_SCORE_DATA.factors.map((f, i) => {
-                  const isBad = f.factor === 'Assignments' ? f.currentValue > f.threshold : f.currentValue < f.threshold;
-                  const pct = f.factor === 'Assignments' 
+                {topFactors.map((f, i) => {
+                  const inverseFactor = f.factor === 'submission_timeliness';
+                  const isBad = inverseFactor ? f.currentValue > f.threshold : f.currentValue < f.threshold;
+                  const pct = inverseFactor
                     ? Math.min(100, (f.threshold / Math.max(f.currentValue, 1)) * 100)
-                    : Math.min(100, (f.currentValue / f.threshold) * 100);
+                    : Math.min(100, (f.currentValue / Math.max(f.threshold, 1)) * 100);
 
                   return (
                     <div key={f.factor} className="group">
@@ -240,10 +318,10 @@ export default function StudentDashboard() {
             </div>
             
             <div className="grid grid-cols-1 gap-4">
-              {SUBJECT_PERFORMANCE.map(s => (
+              {subjectPerformance.map(s => (
                 <Link 
-                  href={`/student/subjects?id=${s.id}`} 
-                  key={s.id}
+                  href={`/student/subjects?id=${s.subjectId}`} 
+                  key={s.subjectId}
                   className="block bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group"
                 >
                   <div className="flex justify-between items-start mb-4">
@@ -251,17 +329,17 @@ export default function StudentDashboard() {
                       <h4 className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors">{s.name}</h4>
                       <p className="text-xs font-medium text-gray-500 mt-0.5">{s.faculty}</p>
                     </div>
-                    <RiskBadge level={s.riskLevel as RiskLevel} />
+                    <RiskBadge level={getSubjectRiskLevel(s)} />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><FileText className="w-3 h-3"/> Internal Marks</p>
-                      <p className="text-lg font-black text-gray-800">{s.marks.obtained}<span className="text-xs font-bold text-gray-400">/{s.marks.max}</span></p>
+                      <p className="text-lg font-black text-gray-800">{s.marksPercent}<span className="text-xs font-bold text-gray-400">%</span></p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><BookOpen className="w-3 h-3"/> Assignments</p>
-                      <p className="text-lg font-black text-gray-800">{s.assignments.completed}<span className="text-xs font-bold text-gray-400">/{s.assignments.total}</span></p>
+                      <p className="text-lg font-black text-gray-800">{s.completionRate}<span className="text-xs font-bold text-gray-400">%</span></p>
                     </div>
                   </div>
                 </Link>
@@ -277,13 +355,13 @@ export default function StudentDashboard() {
                 <p className="text-xs font-medium text-gray-500 mt-1">Score history over the last 8 weeks</p>
               </div>
               <Link href="/student/analytics" className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-colors">
-                <LineChart className="w-4 h-4" />
+                <TrendChartIcon className="w-4 h-4" />
               </Link>
             </div>
             
             <div className="flex-1 w-full min-h-[300px]">
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={RISK_HISTORY} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <RechartsLineChart data={riskHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
                   <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} />
@@ -297,7 +375,7 @@ export default function StudentDashboard() {
                     dot={renderDashboardDot}
                     activeDot={{ r: 8, strokeWidth: 0, fill: '#2563EB' }}
                   />
-                </LineChart>
+                </RechartsLineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-4 flex items-center justify-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -317,13 +395,13 @@ export default function StudentDashboard() {
             </h3>
             
             <div className="space-y-3">
-              {PENDING_ASSIGNMENTS.map(pa => {
-                const daysLeft = Math.ceil((new Date(pa.dueDate).getTime() - new Date('2026-04-18').getTime()) / 86400000);
+              {data.pendingAssignments.map(pa => {
+                const daysLeft = Math.ceil((new Date(pa.dueDate).getTime() - Date.now()) / 86400000);
                 return (
-                  <div key={pa.id} className="bg-orange-50/50 border border-orange-100 rounded-lg p-4 flex gap-4 items-center">
+                  <div key={`${pa.title}-${pa.dueDate}`} className="bg-orange-50/50 border border-orange-100 rounded-lg p-4 flex gap-4 items-center">
                     <div className="w-12 h-12 rounded-xl bg-white border border-orange-200 flex flex-col items-center justify-center shrink-0 shadow-sm">
                       <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Due in</span>
-                      <span className="text-lg font-black text-orange-600 leading-none">{daysLeft}d</span>
+                      <span className="text-lg font-black text-orange-600 leading-none">{Math.max(daysLeft, 0)}d</span>
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-bold text-gray-900 leading-tight">{pa.title}</h4>
@@ -350,15 +428,15 @@ export default function StudentDashboard() {
             </div>
 
             <div className="space-y-3">
-              {ALERTS.slice(0, 3).map(alert => (
-                <div key={alert.id} className={`p-4 rounded-xl border flex gap-3 ${alert.isRead ? 'bg-gray-50 border-gray-100' : 'bg-blue-50/30 border-blue-100'}`}>
+              {data.alerts.slice(0, 3).map(alert => (
+                <div key={alert.id} className={`p-4 rounded-xl border flex gap-3 ${alert.status === 'unread' ? 'bg-blue-50/30 border-blue-100' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="mt-1">
-                    {alert.priority === 'High' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : <Calendar className="w-4 h-4 text-blue-500" />}
+                    {alert.priority === 'high' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : <Calendar className="w-4 h-4 text-blue-500" />}
                   </div>
                   <div>
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="text-sm font-bold text-gray-900">{alert.title}</h4>
-                      <span className="text-[10px] font-bold text-gray-400">{alert.dateTime}</span>
+                      <span className="text-[10px] font-bold text-gray-400">{formatRelativeDate(alert.sentAt)}</span>
                     </div>
                     <p className="text-xs font-medium text-gray-600 leading-relaxed">{alert.message}</p>
                   </div>

@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { STUDENT_INFO } from '@/src/lib/studentData';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchStudentDashboardData } from '@/src/lib/studentDashboardClient';
 import { LayoutDashboard, GraduationCap, LineChart, Bell, User } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -15,6 +16,33 @@ const NAV_ITEMS = [
 
 export default function StudentSidebar() {
   const pathname = usePathname();
+  const [studentName, setStudentName] = useState('Student');
+  const [studentId, setStudentId] = useState('');
+  const [batch, setBatch] = useState('');
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+
+  useEffect(() => {
+    async function loadSidebarData() {
+      const result = await fetchStudentDashboardData();
+      if (!result.ok) return;
+
+      setStudentName(result.data.student.fullName || 'Student');
+      setStudentId(result.data.student.studentId || '');
+      setBatch(result.data.student.batch || '');
+      setUnreadAlerts(
+        typeof result.data.unreadAlertCount === 'number'
+          ? result.data.unreadAlertCount
+          : result.data.alerts.filter((alert) => alert.status === 'unread').length
+      );
+    }
+
+    void loadSidebarData();
+  }, []);
+
+  const initials = useMemo(
+    () => studentName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
+    [studentName]
+  );
 
   const handleSignOut = async () => {
     try {
@@ -58,9 +86,9 @@ export default function StudentSidebar() {
             >
               <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
               {item.label}
-              {item.label === 'Alerts' && (
+              {item.label === 'Alerts' && unreadAlerts > 0 && (
                 <span className="ml-auto bg-red-100 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  2
+                  {unreadAlerts}
                 </span>
               )}
             </Link>
@@ -72,13 +100,11 @@ export default function StudentSidebar() {
       <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50/50">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 shadow-sm flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-white">
-              {STUDENT_INFO.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-            </span>
+            <span className="text-xs font-bold text-white">{initials || 'ST'}</span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{STUDENT_INFO.name}</p>
-            <p className="text-[11px] text-gray-500 truncate">{STUDENT_INFO.id} • {STUDENT_INFO.batch}</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">{studentName}</p>
+            <p className="text-[11px] text-gray-500 truncate">{studentId}{batch ? ` • ${batch}` : ''}</p>
           </div>
         </div>
         <button
