@@ -33,7 +33,12 @@ interface AssignmentsPageData {
     dueDate: string;
     maxMarks: number;
   }>;
-  submissions: Record<string, Record<string, { status: UiSubmissionStatus; marks: number | null }>>;
+  submissions: Record<string, Record<string, {
+    status: UiSubmissionStatus;
+    marks: number | null;
+    fileUrl: string | null;
+    fileName: string | null;
+  }>>;
   flags: Record<string, { note: string; flaggedAt: string }>;
 }
 
@@ -299,12 +304,16 @@ export default function TeacherAssignmentsPage() {
         const record = editableSubmissions[selectedAssignment.id]?.[student.id] || {
           status: 'Not Submitted' as UiSubmissionStatus,
           marks: null,
+          fileUrl: null,
+          fileName: null,
         };
 
         return {
           student,
           status: record.status,
           marks: record.marks,
+          fileUrl: record.fileUrl,
+          fileName: record.fileName,
           isFlagged: Boolean(data.flags[student.id]),
         };
       })
@@ -319,10 +328,14 @@ export default function TeacherAssignmentsPage() {
       const before = originalSubmissions[selectedAssignment.id]?.[student.id] || {
         status: 'Not Submitted' as UiSubmissionStatus,
         marks: null,
+        fileUrl: null,
+        fileName: null,
       };
       const after = editableSubmissions[selectedAssignment.id]?.[student.id] || {
         status: 'Not Submitted' as UiSubmissionStatus,
         marks: null,
+        fileUrl: null,
+        fileName: null,
       };
 
       if (before.status !== after.status || before.marks !== after.marks) {
@@ -360,8 +373,14 @@ export default function TeacherAssignmentsPage() {
       [selectedAssignment.id]: {
         ...prev[selectedAssignment.id],
         [studentId]: {
-          status: patch.status || prev[selectedAssignment.id]?.[studentId]?.status || 'Not Submitted',
-          marks: patch.marks !== undefined ? patch.marks : prev[selectedAssignment.id]?.[studentId]?.marks ?? null,
+            ...(prev[selectedAssignment.id]?.[studentId] || {
+              status: 'Not Submitted' as UiSubmissionStatus,
+              marks: null,
+              fileUrl: null,
+              fileName: null,
+            }),
+            status: patch.status ?? prev[selectedAssignment.id]?.[studentId]?.status ?? 'Not Submitted',
+            marks: patch.marks !== undefined ? patch.marks : prev[selectedAssignment.id]?.[studentId]?.marks ?? null,
         },
       },
     }));
@@ -377,10 +396,14 @@ export default function TeacherAssignmentsPage() {
         const before = originalSubmissions[selectedAssignment.id]?.[student.id] || {
           status: 'Not Submitted' as UiSubmissionStatus,
           marks: null,
+          fileUrl: null,
+          fileName: null,
         };
         const after = editableSubmissions[selectedAssignment.id]?.[student.id] || {
           status: 'Not Submitted' as UiSubmissionStatus,
           marks: null,
+          fileUrl: null,
+          fileName: null,
         };
 
         if (before.status === after.status && before.marks === after.marks) {
@@ -756,6 +779,7 @@ export default function TeacherAssignmentsPage() {
                       <th className="px-5 py-2.5 text-left text-xs font-semibold text-gray-500">Student</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Batch</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Status</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Submission</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">
                         Marks <span className="text-gray-400 font-normal">/ {selectedAssignment.maxMarks}</span>
                       </th>
@@ -800,6 +824,20 @@ export default function TeacherAssignmentsPage() {
                               <option value="Late">Late</option>
                               <option value="Not Submitted">Not Submitted</option>
                             </select>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-gray-600">
+                            {row.fileUrl ? (
+                              <a
+                                href={row.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                              >
+                                {row.fileName || 'View PDF'}
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5">
                             {row.status !== 'Not Submitted' ? (
@@ -849,7 +887,7 @@ export default function TeacherAssignmentsPage() {
 
                     {rows.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">
+                        <td colSpan={7} className="px-4 py-10 text-center text-xs text-gray-400">
                           No students match current filters.
                         </td>
                       </tr>

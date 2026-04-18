@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { 
   fetchStudentDashboardData,
   formatRelativeDate,
@@ -21,6 +21,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText, LineChart as TrendChartIcon } from 'lucide-react';
+
+const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 
 // ─── Reusable Topbar ────────────────────────────────────────────────────────
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -127,6 +129,8 @@ export default function StudentDashboard() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [submittingAssignmentId, setSubmittingAssignmentId] = useState('');
+  const [pendingUploadAssignmentId, setPendingUploadAssignmentId] = useState('');
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const riskHistory: RiskHistoryItem[] = useMemo(() => {
     if (!data) return [];
@@ -176,18 +180,34 @@ export default function StudentDashboard() {
     void loadData();
   }, []);
 
-  async function handleSubmitAssignment(assignmentId: string) {
-    if (!assignmentId) return;
+  async function handleSubmitAssignment(assignmentId: string, file: File) {
+    if (!assignmentId || !file) return;
+
+    const isPdfMimeType = file.type === 'application/pdf';
+    const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
+
+    if (!isPdfMimeType && !hasPdfExtension) {
+      setError('Only PDF files are allowed for assignment submissions.');
+      return;
+    }
+
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setError('PDF must be 10MB or smaller.');
+      return;
+    }
 
     setSubmittingAssignmentId(assignmentId);
     setError('');
     setNotice('');
 
     try {
+      const formData = new FormData();
+      formData.append('assignmentId', assignmentId);
+      formData.append('file', file);
+
       const response = await fetch('/api/student/assignments/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId }),
+        body: formData,
       });
       const json = await response.json();
 
@@ -206,7 +226,33 @@ export default function StudentDashboard() {
       setError('Failed to submit assignment.');
     } finally {
       setSubmittingAssignmentId('');
+      setPendingUploadAssignmentId('');
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = '';
+      }
     }
+  }
+
+  function openPdfPicker(assignmentId: string) {
+    if (!assignmentId || submittingAssignmentId) return;
+    setPendingUploadAssignmentId(assignmentId);
+    setError('');
+    setNotice('');
+    uploadInputRef.current?.click();
+  }
+
+  function handlePdfSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file || !pendingUploadAssignmentId) {
+      setPendingUploadAssignmentId('');
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = '';
+      }
+      return;
+    }
+
+    void handleSubmitAssignment(pendingUploadAssignmentId, file);
   }
 
   if (loading) {
@@ -458,6 +504,14 @@ export default function StudentDashboard() {
             </h3>
             
             <div className="space-y-3">
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={handlePdfSelected}
+              />
+
               {pendingAssignments.length === 0 && (
                 <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-xs font-semibold text-green-700">
                   No pending assignments right now. Keep it up.
@@ -478,12 +532,12 @@ export default function StudentDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        void handleSubmitAssignment(pa.assignmentId);
+                        openPdfPicker(pa.assignmentId);
                       }}
                       disabled={!pa.assignmentId || submittingAssignmentId === pa.assignmentId}
                       className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-60"
                     >
-                      {submittingAssignmentId === pa.assignmentId ? 'Submitting...' : 'Submit'}
+                      {submittingAssignmentId === pa.assignmentId ? 'Submitting...' : 'Submit PDF'}
                     </button>
                   </div>
                 );

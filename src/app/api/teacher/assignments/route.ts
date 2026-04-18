@@ -65,7 +65,17 @@ async function hasTeacherAccessToAssignment(teacherId: string, assignmentId: str
 async function ensureStudentAssignment(assignmentId: string, studentId: string): Promise<void> {
   await StudentAssignment.findOneAndUpdate(
     { assignmentId, studentId },
-    { $setOnInsert: { status: "not_submitted", marksObtained: null, submittedAt: null } },
+    {
+      $setOnInsert: {
+        status: "not_submitted",
+        marksObtained: null,
+        submittedAt: null,
+        submissionFileUrl: null,
+        submissionFileName: null,
+        submissionMimeType: null,
+        submissionSizeBytes: null,
+      },
+    },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 }
@@ -315,14 +325,23 @@ export async function PUT(request: NextRequest) {
 
       await ensureStudentAssignment(update.assignmentId, update.studentId);
 
+      const updatePayload: Record<string, unknown> = {
+        status: dbStatus,
+        marksObtained: dbStatus === "not_submitted" ? null : update.marks,
+        submittedAt: dbStatus === "not_submitted" ? null : now,
+      };
+
+      if (dbStatus === "not_submitted") {
+        updatePayload.submissionFileUrl = null;
+        updatePayload.submissionFileName = null;
+        updatePayload.submissionMimeType = null;
+        updatePayload.submissionSizeBytes = null;
+      }
+
       await StudentAssignment.findOneAndUpdate(
         { assignmentId: update.assignmentId, studentId: update.studentId },
         {
-          $set: {
-            status: dbStatus,
-            marksObtained: dbStatus === "not_submitted" ? null : update.marks,
-            submittedAt: dbStatus === "not_submitted" ? null : now,
-          },
+          $set: updatePayload,
         },
         { new: true }
       );
@@ -408,6 +427,13 @@ export async function PATCH(request: NextRequest) {
 
       if (dbStatus === "not_submitted" || body.marksBehavior === "clear") {
         updatePayload.marksObtained = null;
+      }
+
+      if (dbStatus === "not_submitted") {
+        updatePayload.submissionFileUrl = null;
+        updatePayload.submissionFileName = null;
+        updatePayload.submissionMimeType = null;
+        updatePayload.submissionSizeBytes = null;
       }
 
       await StudentAssignment.findOneAndUpdate(

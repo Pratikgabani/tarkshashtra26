@@ -7,6 +7,10 @@ export interface IStudentAssignment extends Document {
   status: SubmissionStatus;
   marksObtained: number | null;
   submittedAt: Date | null;
+  submissionFileUrl?: string | null;
+  submissionFileName?: string | null;
+  submissionMimeType?: string | null;
+  submissionSizeBytes?: number | null;
 }
 
 const StudentAssignmentSchema: Schema<IStudentAssignment> = new Schema(
@@ -21,6 +25,10 @@ const StudentAssignmentSchema: Schema<IStudentAssignment> = new Schema(
     },
     marksObtained: { type: Number, default: null },
     submittedAt: { type: Date, default: null },
+    submissionFileUrl: { type: String, trim: true, default: null },
+    submissionFileName: { type: String, trim: true, default: null },
+    submissionMimeType: { type: String, trim: true, default: null },
+    submissionSizeBytes: { type: Number, default: null },
   },
   { timestamps: true }
 );

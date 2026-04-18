@@ -63,6 +63,8 @@ export interface TeacherAssignment {
 export interface TeacherSubmissionRecord {
   status: UiSubmissionStatus;
   marks: number | null;
+  fileUrl: string | null;
+  fileName: string | null;
 }
 
 export interface TeacherFlagRecord {
@@ -277,7 +279,12 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
     if (!subject) continue;
 
     for (const student of students) {
-      submissions[assignment.id][student.id] = { status: "Not Submitted", marks: null };
+      submissions[assignment.id][student.id] = {
+        status: "Not Submitted",
+        marks: null,
+        fileUrl: null,
+        fileName: null,
+      };
     }
   }
 
@@ -297,6 +304,8 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
     submissions[assignmentId][studentId] = {
       status: dbSubmissionStatusToUiStatus(submission.status),
       marks: submission.marksObtained,
+      fileUrl: submission.submissionFileUrl ?? null,
+      fileName: submission.submissionFileName ?? null,
     };
   }
 
