@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "EduShield — Academic Risk Detection Platform",
+  title: "ShikshaSetu — Academic Risk Detection Platform",
   description:
     "Early Academic Risk Detection & Student Intervention Platform. Identify at-risk students proactively with multi-factor risk scoring.",
 };

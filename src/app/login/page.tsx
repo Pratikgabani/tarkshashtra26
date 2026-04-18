@@ -41,9 +41,16 @@ export default function LoginPage() {
         return;
       }
 
-      // TODO: Store session/token and redirect based on role
-      // For now, redirect to home
-      window.location.href = "/";
+      // Store user session and redirect based on role
+      localStorage.setItem("shikshasetu_user", JSON.stringify(data.user));
+
+      if (data.user.role === "student") {
+        window.location.href = "/student/dashboard";
+      } else if (data.user.role === "mentor") {
+        window.location.href = "/mentor/dashboard";
+      } else {
+        window.location.href = "/";
+      }
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
