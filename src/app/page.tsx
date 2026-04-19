@@ -1,9 +1,11 @@
+"use client";
+
 import Link from "next/link";
 
 function LiveDataPanel() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden text-sm">
-      <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
+    <div className="live-panel rounded-2xl border border-gray-200/70 bg-white/85 shadow-[0_22px_48px_rgba(15,23,42,0.10)] overflow-hidden text-sm backdrop-blur-[2px]">
+      <div className="border-b border-gray-100 bg-white/80 px-4 py-3">
         <p className="font-semibold text-gray-800 text-xs">
           Live Data Pipeline
         </p>
@@ -18,7 +20,7 @@ function LiveDataPanel() {
             (source) => (
               <div
                 key={source}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                className="live-chip rounded-xl border border-gray-200/70 bg-white/75 px-3 py-2"
               >
                 <p className="text-[11px] font-semibold text-gray-700">
                   {source}
@@ -31,7 +33,7 @@ function LiveDataPanel() {
           )}
         </div>
 
-        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+        <div className="rounded-xl border border-blue-100/80 bg-blue-50/70 p-3">
           <p className="text-xs font-semibold text-blue-800">
             No hardcoded dashboard records
           </p>
@@ -42,14 +44,13 @@ function LiveDataPanel() {
           </p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-3">
+        <div className="rounded-xl border border-gray-200/70 bg-white/70 p-3">
           <p className="text-[11px] font-semibold text-gray-800">
             Risk scoring flow
           </p>
           <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
-            Risk scores are calculated from attendance, marks, assignment
-            completion, LMS engagement, and submission timeliness when an
-            external model is not configured.
+            Risk Score = 0.4 × (100 - Attendance%) + 0.3 × (100 - Marks%) + 0.2
+            × (100 - Assignment%) + 0.1 × (100 - LMS Engagement%).
           </p>
         </div>
       </div>
@@ -63,22 +64,6 @@ function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded bg-blue-600 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-          </div>
           <span className="font-semibold text-gray-900 text-sm tracking-tight">
             ShikshaSetu
           </span>
@@ -147,23 +132,9 @@ export default function LandingPage() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded font-medium hover:bg-blue-700 transition-colors text-sm"
+                  className="inline-flex items-center bg-blue-600 text-white px-5 py-2.5 rounded font-medium hover:bg-blue-700 transition-colors text-sm"
                 >
                   View Demo Dashboard
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
                 </Link>
                 <a
                   href="#how-it-works"
@@ -175,80 +146,25 @@ export default function LandingPage() {
               {/* Trust indicators */}
               <div className="mt-10 flex items-center gap-6 text-sm text-gray-500">
                 <div className="flex items-center gap-1.5">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-green-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  5-Factor Risk Algorithm
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
+                  4-Factor Risk Formula
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-green-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
                   Role-Based Access
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-green-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
                   Automated Alerts
                 </div>
               </div>
             </div>
 
             {/* Right - Live Data Overview */}
-            <div className="relative lg:pl-4">
+            <div className="hero-panel-shell relative lg:pl-4">
               <LiveDataPanel />
               {/* Alert banner floating */}
-              <div className="absolute -bottom-4 -left-4 bg-white border border-red-200 rounded-lg px-3 py-2 shadow-md flex items-start gap-2 max-w-xs">
-                <span className="text-red-500 mt-0.5">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                    />
-                  </svg>
-                </span>
+              <div className="hero-alert absolute -bottom-4 -left-4 bg-white/90 border border-gray-200/80 rounded-xl px-3 py-2 shadow-[0_14px_32px_rgba(15,23,42,0.10)] flex items-start max-w-xs backdrop-blur-[2px]">
                 <div>
                   <p className="text-xs font-semibold text-gray-800">
                     High-Risk Alert
@@ -283,93 +199,27 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
-                icon: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-orange-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-                    />
-                  </svg>
-                ),
                 title: "Data is scattered",
                 desc: "Attendance, marks, and LMS data live in separate systems. No one sees the full picture.",
               },
               {
-                icon: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-orange-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                ),
                 title: "No early warning system",
                 desc: "Reports are generated at fixed intervals. Warning signals are invisible between cycles.",
               },
               {
-                icon: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-orange-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
-                    />
-                  </svg>
-                ),
                 title: "Intervention is too late",
                 desc: "By the time counselling is arranged, students have already lost motivation and missed exams.",
               },
               {
-                icon: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-orange-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                ),
                 title: "Students are unaware",
                 desc: "Students don&apos;t know they are at risk until they receive a failing grade. No self-awareness portal exists.",
               },
             ].map((p) => (
               <div
                 key={p.title}
-                className="bg-white border border-gray-200 rounded-lg p-5"
+                className="premium-card bg-white/80 border border-gray-200/70 rounded-2xl p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-[1px]"
               >
-                <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center mb-4">
-                  {p.icon}
-                </div>
+                <span className="block h-0.5 w-8 rounded-full bg-orange-300/80 mb-4" />
                 <h3 className="font-semibold text-gray-900 text-sm mb-1.5">
                   {p.title}
                 </h3>
@@ -385,7 +235,7 @@ export default function LandingPage() {
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────────── */}
       <section
         id="how-it-works"
-        className="py-16 bg-white border-b border-gray-100"
+        className="scroll-mt-24 py-16 bg-white border-b border-gray-100"
       >
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-10">
@@ -396,34 +246,27 @@ export default function LandingPage() {
               A Single System That Connects Everything
             </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6 relative">
-            {/* connector lines */}
-            <div className="hidden md:block absolute top-10 left-1/3 right-1/3 h-px bg-gray-200" />
-            <div className="hidden md:block absolute top-10 left-2/3 right-0 h-px bg-gray-200" />
-
+          <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                step: "01",
+                step: "1",
                 title: "Collect Data",
                 desc: "Attendance records, internal marks, assignment submissions, and LMS login activity are all aggregated in one place — automatically.",
                 tags: ["Attendance", "Marks", "Assignments", "LMS Activity"],
-                color: "bg-blue-600",
               },
               {
-                step: "02",
+                step: "2",
                 title: "Calculate Risk",
-                desc: "A 5-factor weighted algorithm generates an objective Risk Score (0–100) for every student. Recalculated every 24 hours or on new data entry.",
+                desc: "A 4-factor weighted formula generates an objective Risk Score (0–100) for every student using attendance, marks, assignment, and LMS engagement percentages.",
                 tags: [
-                  "30% Attendance",
-                  "25% Marks",
-                  "20% Assignments",
-                  "15% LMS",
-                  "10% Timeliness",
+                  "40% Attendance",
+                  "30% Marks",
+                  "20% Assignment",
+                  "10% LMS Engagement",
                 ],
-                color: "bg-orange-500",
               },
               {
-                step: "03",
+                step: "3",
                 title: "Take Action",
                 desc: "Mentors receive alerts, log interventions, and track improvement. Students see personalized suggestions. Coordinators monitor trends.",
                 tags: [
@@ -432,17 +275,16 @@ export default function LandingPage() {
                   "Reports",
                   "Progress Tracking",
                 ],
-                color: "bg-green-600",
               },
             ].map((step) => (
               <div
                 key={step.step}
-                className="bg-[#F9FAFB] border border-gray-200 rounded-lg p-6 relative"
+                className="premium-card bg-[#F9FAFB]/75 border border-gray-200/70 rounded-2xl p-6 relative shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
               >
-                <div
-                  className={`w-9 h-9 rounded-full ${step.color} text-white text-sm font-bold flex items-center justify-center mb-4`}
-                >
-                  {step.step}
+                <div className="step-badge">
+                  <span className="step-badge-number">
+                    {step.step.padStart(2, "0")}
+                  </span>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">
                   {step.title}
@@ -454,7 +296,7 @@ export default function LandingPage() {
                   {step.tags.map((t) => (
                     <span
                       key={t}
-                      className="text-xs bg-white border border-gray-200 text-gray-600 px-2 py-0.5 rounded"
+                      className="text-xs bg-white/80 border border-gray-200/70 text-gray-600 px-2.5 py-1 rounded-full"
                     >
                       {t}
                     </span>
@@ -469,7 +311,7 @@ export default function LandingPage() {
       {/* ── FEATURES ─────────────────────────────────────────────────────────── */}
       <section
         id="features"
-        className="py-16 bg-[#F9FAFB] border-b border-gray-100"
+        className="scroll-mt-24 py-16 bg-[#F9FAFB] border-b border-gray-100"
       >
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-10">
@@ -483,41 +325,35 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               {
-                icon: "📊",
                 title: "Faculty Mentor Dashboard",
                 desc: "Filterable student table with risk scores, attendance, pending assignments, and quick-action buttons per student.",
               },
               {
-                icon: "👤",
                 title: "Student Self-View Portal",
                 desc: "Students see their own risk score, top contributing factors, and specific, actionable improvement suggestions.",
               },
               {
-                icon: "🧮",
                 title: "Risk Score + Explanation",
                 desc: "Every score includes a plain-English breakdown showing WHY the student is at risk — with current vs. required values.",
               },
               {
-                icon: "📝",
                 title: "Intervention Logging",
                 desc: "Mentors log counselling sessions, remedial classes, and study plans against specific students with outcome tracking.",
               },
               {
-                icon: "📈",
                 title: "Pre / Post Comparison",
                 desc: "Automatically compare a student's academic metrics before and after an intervention to measure real impact.",
               },
               {
-                icon: "🔔",
                 title: "Automated Alert System",
                 desc: "Mentors are notified when risk crosses thresholds, attendance drops, or follow-up dates are approaching.",
               },
             ].map((f) => (
               <div
                 key={f.title}
-                className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-200 hover:shadow-sm transition-all"
+                className="premium-card bg-white/80 border border-gray-200/70 rounded-2xl p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-[1px] hover:border-blue-200/80 hover:shadow-[0_14px_32px_rgba(15,23,42,0.08)] transition-all"
               >
-                <div className="text-2xl mb-3">{f.icon}</div>
+                <span className="block h-0.5 w-8 rounded-full bg-blue-300/80 mb-4" />
                 <h3 className="font-semibold text-gray-900 text-sm mb-1.5">
                   {f.title}
                 </h3>
@@ -531,7 +367,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── ROLES ────────────────────────────────────────────────────────────── */}
-      <section id="roles" className="py-16 bg-white border-b border-gray-100">
+      <section
+        id="roles"
+        className="scroll-mt-24 py-16 bg-white border-b border-gray-100"
+      >
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-10">
             <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">
@@ -546,7 +385,6 @@ export default function LandingPage() {
               {
                 role: "Student",
                 color: "border-t-blue-500",
-                icon: "🎓",
                 capabilities: [
                   "View personal risk score",
                   "See top contributing factors",
@@ -558,7 +396,6 @@ export default function LandingPage() {
               {
                 role: "Faculty Mentor",
                 color: "border-t-orange-500",
-                icon: "👨‍🏫",
                 capabilities: [
                   "Monitor all assigned mentees",
                   "Filter by risk level & class",
@@ -570,7 +407,6 @@ export default function LandingPage() {
               {
                 role: "Subject Teacher",
                 color: "border-t-purple-500",
-                icon: "📚",
                 capabilities: [
                   "Enter assessment marks (grid view)",
                   "Manage assignment submissions",
@@ -582,7 +418,6 @@ export default function LandingPage() {
               {
                 role: "Academic Coordinator",
                 color: "border-t-green-500",
-                icon: "🏛️",
                 capabilities: [
                   "View institution-level analytics",
                   "Monitor intervention effectiveness",
@@ -594,9 +429,8 @@ export default function LandingPage() {
             ].map((r) => (
               <div
                 key={r.role}
-                className={`bg-[#F9FAFB] border border-gray-200 border-t-4 ${r.color} rounded-lg p-5`}
+                className={`premium-card bg-[#F9FAFB]/80 border border-gray-200/70 border-t-4 ${r.color} rounded-2xl p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-[1px]`}
               >
-                <div className="text-2xl mb-2">{r.icon}</div>
                 <h3 className="font-semibold text-gray-900 mb-3 text-sm">
                   {r.role}
                 </h3>
@@ -606,20 +440,7 @@ export default function LandingPage() {
                       key={c}
                       className="flex items-start gap-2 text-xs text-gray-600"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2.5}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-400/80 shrink-0" />
                       {c}
                     </li>
                   ))}
@@ -640,39 +461,41 @@ export default function LandingPage() {
             <h2 className="text-2xl font-bold text-white">
               From Reactive to Proactive Academic Support
             </h2>
-            <p className="text-gray-400 mt-2 text-sm max-w-xl">
-              Institutions that detect academic risk early consistently see
-              better outcomes — for students and faculty alike.
-            </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-gray-700 rounded-lg overflow-hidden">
             {[
               {
                 value: "3–4 wks",
-                label: "Earlier identification of struggling students",
-                icon: "⏰",
+                title: "Earlier Detection",
+                desc: "Struggling students can be identified weeks before major exams.",
               },
               {
                 value: "↓ 40%",
-                label: "Reduction in undetected at-risk cases",
-                icon: "📉",
+                title: "Lower Blind Spots",
+                desc: "Undetected at-risk student cases can be reduced significantly.",
               },
               {
                 value: "100%",
-                label: "Intervention actions tracked and auditable",
-                icon: "✅",
+                title: "Intervention Auditability",
+                desc: "Every mentor action is tracked with a clear timeline and outcomes.",
               },
               {
                 value: "2×",
-                label: "Faster faculty response to high-risk cases",
-                icon: "⚡",
+                title: "Faster Responses",
+                desc: "Faculty can respond to high-risk students nearly twice as fast.",
               },
             ].map((s) => (
-              <div key={s.label} className="bg-[#1E293B] px-6 py-8">
-                <div className="text-2xl mb-2">{s.icon}</div>
+              <div
+                key={s.title}
+                className="premium-card bg-[#1E293B]/90 border border-[#334155]/80 px-6 py-8"
+              >
+                <span className="block h-0.5 w-10 rounded-full bg-blue-400/70 mb-4" />
                 <p className="text-3xl font-bold text-white mb-2">{s.value}</p>
+                <p className="text-sm font-semibold text-blue-100 mb-1">
+                  {s.title}
+                </p>
                 <p className="text-gray-400 text-sm leading-relaxed">
-                  {s.label}
+                  {s.desc}
                 </p>
               </div>
             ))}
@@ -704,20 +527,7 @@ export default function LandingPage() {
                   "Factor contribution shown as percentage of total risk",
                 ].map((i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-blue-500 mt-0.5 shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500/80 shrink-0" />
                     {i}
                   </li>
                 ))}
@@ -725,9 +535,9 @@ export default function LandingPage() {
             </div>
 
             {/* Sample Risk Card */}
-            <div className="bg-[#F9FAFB] border border-gray-200 rounded-xl overflow-hidden">
+            <div className="premium-card bg-[#F9FAFB]/85 border border-gray-200/70 rounded-2xl overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
               {/* Risk header */}
-              <div className="bg-white border-b border-gray-200 px-5 py-4 flex items-start justify-between">
+              <div className="bg-white/85 border-b border-gray-200/70 px-5 py-4 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">
                     Arjun Mehta
@@ -784,7 +594,7 @@ export default function LandingPage() {
                 ].map((f) => (
                   <div
                     key={f.rank}
-                    className="bg-white border border-gray-200 rounded-lg p-3"
+                    className="premium-card bg-white/85 border border-gray-200/70 rounded-xl p-3"
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -811,9 +621,9 @@ export default function LandingPage() {
                   </div>
                 ))}
                 {/* Suggestion */}
-                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                <div className="premium-card bg-blue-50/70 border border-blue-100/80 rounded-xl px-4 py-3">
                   <p className="text-xs font-semibold text-blue-800 mb-1">
-                    💡 Suggested Action
+                    Suggested Action
                   </p>
                   <p className="text-xs text-blue-700 leading-relaxed">
                     Attend at least 5 more classes this month and submit 5
@@ -827,55 +637,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FINAL CTA ────────────────────────────────────────────────────────── */}
-      <section className="py-16 bg-[#F9FAFB] border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">
-            Don&apos;t wait until results are out to act.
-          </h2>
-          <p className="text-gray-500 text-sm leading-relaxed mb-8">
-            Academic risk is detectable weeks before exams — if you have the
-            right data. ShikshaSetu gives you that visibility today.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Link
-              href="/login"
-              className="bg-blue-600 text-white px-6 py-2.5 rounded font-medium hover:bg-blue-700 transition-colors text-sm"
-            >
-              View Demo
-            </Link>
-            <Link
-              href="/signup"
-              className="border border-gray-300 text-gray-700 px-6 py-2.5 rounded font-medium hover:bg-white transition-colors text-sm"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* ── FOOTER ───────────────────────────────────────────────────────────── */}
       <footer className="bg-[#0F172A] py-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-3.5 w-3.5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                    />
-                  </svg>
-                </div>
                 <span className="font-semibold text-white text-sm">
                   ShikshaSetu
                 </span>
@@ -912,6 +679,142 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <style jsx global>{`
+        html {
+          scroll-behavior: smooth;
+        }
+
+        .hero-panel-shell {
+          position: relative;
+          transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+          transform-origin: center top;
+        }
+
+        .hero-panel-shell::before {
+          content: "";
+          position: absolute;
+          inset: -16px;
+          border-radius: 28px;
+          background: radial-gradient(
+            circle at 50% 30%,
+            rgba(37, 99, 235, 0.14),
+            rgba(37, 99, 235, 0)
+          );
+          opacity: 0;
+          transition: opacity 360ms ease;
+          pointer-events: none;
+        }
+
+        .hero-panel-shell:hover {
+          transform: translateY(-8px) scale(1.04);
+        }
+
+        .hero-panel-shell:hover::before {
+          opacity: 1;
+        }
+
+        .live-panel {
+          transition:
+            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 420ms ease,
+            border-color 420ms ease;
+        }
+
+        .hero-panel-shell:hover .live-panel {
+          transform: translateY(-4px);
+          border-color: rgba(37, 99, 235, 0.3);
+          box-shadow: 0 28px 60px rgba(37, 99, 235, 0.16);
+        }
+
+        .live-chip {
+          transition:
+            transform 320ms ease,
+            border-color 320ms ease,
+            background-color 320ms ease;
+        }
+
+        .hero-panel-shell:hover .live-chip {
+          transform: translateY(-2px);
+          border-color: rgba(37, 99, 235, 0.28);
+          background-color: rgba(255, 255, 255, 0.95);
+        }
+
+        .hero-alert {
+          transition:
+            transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 360ms ease;
+        }
+
+        .hero-panel-shell:hover .hero-alert {
+          transform: translate(-2px, -6px);
+          box-shadow: 0 22px 42px rgba(37, 99, 235, 0.18);
+        }
+
+        .step-badge {
+          display: inline-flex;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+        }
+
+        .step-badge-number {
+          min-width: 2.3rem;
+          height: 2.3rem;
+          border-radius: 0.78rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.82rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          font-variant-numeric: tabular-nums;
+          color: #111827;
+          border: 1px solid rgba(148, 163, 184, 0.34);
+          background: linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.96),
+            rgba(248, 250, 252, 0.9)
+          );
+          box-shadow:
+            0 6px 14px rgba(15, 23, 42, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        }
+
+        .premium-card:hover .step-badge-number {
+          border-color: rgba(37, 99, 235, 0.35);
+          box-shadow:
+            0 8px 18px rgba(37, 99, 235, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+
+        .premium-card {
+          transition:
+            transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 320ms ease,
+            border-color 320ms ease;
+        }
+
+        .premium-card:hover {
+          transform: translateY(-3px);
+          border-color: rgba(37, 99, 235, 0.35);
+          box-shadow: 0 14px 30px rgba(37, 99, 235, 0.12);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          html {
+            scroll-behavior: auto;
+          }
+
+          .hero-panel-shell,
+          .live-panel,
+          .live-chip,
+          .hero-alert,
+          .premium-card {
+            transform: none;
+            transition: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
