@@ -10,8 +10,14 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
 
-const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_SOLUTION_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const SUBMISSION_UPLOADS_RELATIVE_DIR = "uploads/assignment-submissions";
+const ALLOWED_SOLUTION_FILE_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
+const ALLOWED_SOLUTION_FILE_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 function resolveSubmissionStatus(now: Date, dueDate: Date): "submitted_on_time" | "submitted_late" {
   return now.getTime() <= dueDate.getTime() ? "submitted_on_time" : "submitted_late";
@@ -23,6 +29,18 @@ function sanitizeBaseName(fileName: string): string {
   return cleaned || "submission";
 }
 
+function resolveAllowedFileExtension(file: File): string | null {
+  const extensionFromName = path.extname(file.name).toLowerCase();
+  if (ALLOWED_SOLUTION_FILE_EXTENSIONS.has(extensionFromName)) {
+    return extensionFromName;
+  }
+
+  if (file.type === "application/pdf") return ".pdf";
+  if (file.type === "application/msword") return ".doc";
+  if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return ".docx";
+  return null;
+}
+
 function resolveExistingUploadAbsolutePath(fileUrl: string): string | null {
   const normalized = fileUrl.replace(/\\/g, "/");
   const expectedPrefix = `/${SUBMISSION_UPLOADS_RELATIVE_DIR}/`;
@@ -32,7 +50,7 @@ function resolveExistingUploadAbsolutePath(fileUrl: string): string | null {
 
 /**
  * POST /api/student/assignments/submit
- * Multipart body: assignmentId + file (PDF)
+ * Multipart body: assignmentId + file (PDF/DOC/DOCX)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -63,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     if (!(fileField instanceof File)) {
       return NextResponse.json(
-        { success: false, message: "A PDF file is required" },
+        { success: false, message: "A solution file is required" },
         { status: 400 }
       );
     }
@@ -75,19 +93,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (fileField.size > MAX_PDF_SIZE_BYTES) {
+    if (fileField.size > MAX_SOLUTION_FILE_SIZE_BYTES) {
       return NextResponse.json(
-        { success: false, message: "PDF must be 10MB or smaller" },
+        { success: false, message: "Solution file must be 15MB or smaller" },
         { status: 400 }
       );
     }
 
-    const isPdfMimeType = fileField.type === "application/pdf";
-    const hasPdfExtension = fileField.name.toLowerCase().endsWith(".pdf");
+    const extension = resolveAllowedFileExtension(fileField);
+    const isAllowedMimeType = ALLOWED_SOLUTION_FILE_MIME_TYPES.has(fileField.type);
+    const isAllowedByExtension = extension !== null;
 
-    if (!isPdfMimeType && !hasPdfExtension) {
+    if (!isAllowedMimeType && !isAllowedByExtension) {
       return NextResponse.json(
-        { success: false, message: "Only PDF files are allowed" },
+        { success: false, message: "Only PDF, DOC, and DOCX files are allowed" },
+        { status: 400 }
+      );
+    }
+
+    if (!extension) {
+      return NextResponse.json(
+        { success: false, message: "Unsupported file extension. Use PDF, DOC, or DOCX" },
         { status: 400 }
       );
     }
@@ -147,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     const fileBuffer = Buffer.from(await fileField.arrayBuffer());
     const sanitizedBaseName = sanitizeBaseName(fileField.name);
-    const storedFileName = `${studentId}_${assignmentId}_${randomUUID()}_${sanitizedBaseName}.pdf`;
+    const storedFileName = `${studentId}_${assignmentId}_${randomUUID()}_${sanitizedBaseName}${extension}`;
     const storedAbsolutePath = path.join(uploadsAbsoluteDir, storedFileName);
     const submissionFileUrl = `/${SUBMISSION_UPLOADS_RELATIVE_DIR}/${storedFileName}`;
 
@@ -165,7 +191,7 @@ export async function POST(request: NextRequest) {
             submittedAt: now,
             submissionFileUrl,
             submissionFileName: fileField.name,
-            submissionMimeType: fileField.type || "application/pdf",
+            submissionMimeType: fileField.type || "application/octet-stream",
             submissionSizeBytes: fileField.size,
           },
           $setOnInsert: {

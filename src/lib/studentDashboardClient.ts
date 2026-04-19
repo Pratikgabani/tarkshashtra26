@@ -71,6 +71,8 @@ export interface StudentPendingAssignment {
   subjectName: string;
   dueDate: string;
   maxMarks: number;
+  assignmentFileUrl: string | null;
+  assignmentFileName: string | null;
 }
 
 export interface StudentRiskHistoryPoint {

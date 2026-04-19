@@ -23,7 +23,7 @@ import {
 } from 'recharts';
 import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTriangle, Calendar, FileText, LineChart as TrendChartIcon } from 'lucide-react';
 
-const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_SOLUTION_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 // ─── Reusable Topbar ────────────────────────────────────────────────────────
 function Topbar({
@@ -201,16 +201,21 @@ export default function StudentDashboard() {
   async function handleSubmitAssignment(assignmentId: string, file: File) {
     if (!assignmentId || !file) return;
 
-    const isPdfMimeType = file.type === 'application/pdf';
-    const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
 
-    if (!isPdfMimeType && !hasPdfExtension) {
-      setError('Only PDF files are allowed for assignment submissions.');
+    if (!allowedMimeTypes.has(file.type) && !allowedExtensions.includes(extension)) {
+      setError('Only PDF, DOC, and DOCX files are allowed for assignment submissions.');
       return;
     }
 
-    if (file.size > MAX_PDF_SIZE_BYTES) {
-      setError('PDF must be 10MB or smaller.');
+    if (file.size > MAX_SOLUTION_FILE_SIZE_BYTES) {
+      setError('Solution file must be 15MB or smaller.');
       return;
     }
 
@@ -546,7 +551,7 @@ export default function StudentDashboard() {
               <input
                 ref={uploadInputRef}
                 type="file"
-                accept="application/pdf,.pdf"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 onChange={handlePdfSelected}
               />
@@ -567,6 +572,16 @@ export default function StudentDashboard() {
                     <div className="flex-1">
                       <h4 className="text-sm font-bold text-gray-900 leading-tight">{pa.title}</h4>
                       <p className="text-xs font-semibold text-gray-500 mt-1">{pa.subjectName} • Max {pa.maxMarks} marks</p>
+                      {pa.assignmentFileUrl && (
+                        <a
+                          href={pa.assignmentFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                        >
+                          {pa.assignmentFileName ? `View Brief (${pa.assignmentFileName})` : 'View Brief'}
+                        </a>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -576,7 +591,7 @@ export default function StudentDashboard() {
                       disabled={!pa.assignmentId || submittingAssignmentId === pa.assignmentId}
                       className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-60"
                     >
-                      {submittingAssignmentId === pa.assignmentId ? 'Submitting...' : 'Submit PDF'}
+                      {submittingAssignmentId === pa.assignmentId ? 'Submitting...' : 'Upload Solution'}
                     </button>
                   </div>
                 );

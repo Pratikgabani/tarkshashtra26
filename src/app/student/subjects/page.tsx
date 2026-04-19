@@ -4,6 +4,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { fetchStudentDashboardData, type StudentDashboardData, type StudentSubjectPerformance, toUiRiskLevel } from '@/src/lib/studentDashboardClient';
 import { BookOpen, GraduationCap, FileText } from 'lucide-react';
+import { type ChangeEvent, useRef } from 'react';
+
+const MAX_SOLUTION_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 type AssignmentStatus = 'On Time' | 'Late' | 'Missing' | 'Pending';
 
@@ -52,6 +55,10 @@ function SubjectsContent() {
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [submittingAssignmentId, setSubmittingAssignmentId] = useState('');
+  const [pendingUploadAssignmentId, setPendingUploadAssignmentId] = useState('');
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     async function loadSubjects() {
@@ -94,6 +101,85 @@ function SubjectsContent() {
           : 'Performance in this subject is currently healthy. Maintain consistency to keep this level.',
     };
   }, [activeSubject]);
+
+  async function handleSubmitAssignment(assignmentId: string, file: File) {
+    if (!assignmentId || !file) return;
+
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+
+    if (!allowedMimeTypes.has(file.type) && !allowedExtensions.includes(extension)) {
+      setError('Only PDF, DOC, and DOCX files are allowed.');
+      return;
+    }
+
+    if (file.size > MAX_SOLUTION_FILE_SIZE_BYTES) {
+      setError('Solution file must be 15MB or smaller.');
+      return;
+    }
+
+    setSubmittingAssignmentId(assignmentId);
+    setError('');
+    setNotice('');
+
+    try {
+      const formData = new FormData();
+      formData.append('assignmentId', assignmentId);
+      formData.append('file', file);
+
+      const response = await fetch('/api/student/assignments/submit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await response.json();
+      if (!response.ok || !json?.success) {
+        setError(json?.message || 'Failed to submit assignment.');
+        return;
+      }
+
+      const refreshed = await fetchStudentDashboardData();
+      if (refreshed.ok) {
+        setData(refreshed.data);
+      }
+
+      setNotice(json?.message || 'Assignment submitted successfully.');
+    } catch {
+      setError('Failed to submit assignment.');
+    } finally {
+      setSubmittingAssignmentId('');
+      setPendingUploadAssignmentId('');
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = '';
+      }
+    }
+  }
+
+  function openSolutionPicker(assignmentId: string) {
+    if (!assignmentId || submittingAssignmentId) return;
+    setPendingUploadAssignmentId(assignmentId);
+    setError('');
+    setNotice('');
+    uploadInputRef.current?.click();
+  }
+
+  function handleSolutionSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !pendingUploadAssignmentId) {
+      setPendingUploadAssignmentId('');
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = '';
+      }
+      return;
+    }
+
+    void handleSubmitAssignment(pendingUploadAssignmentId, file);
+  }
 
   if (loading) {
     return (
@@ -158,6 +244,17 @@ function SubjectsContent() {
         {/* Right Content: Subject Details */}
         <div className="flex-1 overflow-y-auto bg-white">
           <div className="p-8 max-w-5xl mx-auto space-y-8">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+                {error}
+              </div>
+            )}
+
+            {notice && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs font-semibold text-green-700">
+                {notice}
+              </div>
+            )}
             
             {/* Header / Summary */}
             <div className="border border-gray-200 rounded-2xl p-6 flex items-center justify-between bg-gradient-to-br from-white to-gray-50 shadow-sm relative overflow-hidden">
@@ -218,6 +315,13 @@ function SubjectsContent() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Assignments Status</h3>
                 </div>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={handleSolutionSelected}
+                />
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <table className="w-full text-left">
                     <thead className="bg-gray-50 border-b border-gray-200">
@@ -225,6 +329,7 @@ function SubjectsContent() {
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assignment</th>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Brief</th>
+                        <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Solution</th>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Marks</th>
                       </tr>
                     </thead>
@@ -256,6 +361,20 @@ function SubjectsContent() {
                               ) : (
                                 <span className="text-[10px] font-medium text-gray-400">No file</span>
                               )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <button
+                                type="button"
+                                onClick={() => openSolutionPicker(assignment.assignmentId)}
+                                disabled={submittingAssignmentId === assignment.assignmentId}
+                                className="inline-flex rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-60"
+                              >
+                                {submittingAssignmentId === assignment.assignmentId
+                                  ? 'Uploading...'
+                                  : assignment.status === 'not_submitted'
+                                    ? 'Upload'
+                                    : 'Resubmit'}
+                              </button>
                             </td>
                             <td className="px-4 py-4 text-sm font-black text-right text-gray-900">
                               {assignment.marksObtained ?? '--'}<span className="text-gray-400 font-bold ml-1">/ {assignment.maxMarks}</span>

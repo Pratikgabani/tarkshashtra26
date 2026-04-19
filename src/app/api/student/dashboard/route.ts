@@ -312,6 +312,8 @@ export async function GET(request: NextRequest) {
       subjectName: string;
       dueDate: string;
       maxMarks: number;
+      assignmentFileUrl: string | null;
+      assignmentFileName: string | null;
     }> = [];
 
     for (const assignment of assignments) {
@@ -349,6 +351,8 @@ export async function GET(request: NextRequest) {
           subjectName,
           dueDate: assignment.dueDate.toISOString(),
           maxMarks: assignment.maxMarks,
+          assignmentFileUrl: assignment.attachmentUrl ?? null,
+          assignmentFileName: assignment.attachmentOriginalName ?? null,
         });
       }
     }
