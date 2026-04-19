@@ -92,7 +92,7 @@ function buildDashboardRiskFactors(metrics: {
       suggestion:
         assignmentCompletionRate < 80
           ? "Complete pending assignments before upcoming deadlines."
-          : "Assignment completion is strong.",
+          : "Assignm ent completion is strong.",
     },
     {
       factor: "lms_activity",
@@ -298,6 +298,8 @@ export async function GET(request: NextRequest) {
       dueDate: string;
       marksObtained: number | null;
       maxMarks: number;
+      assignmentFileUrl: string | null;
+      assignmentFileName: string | null;
     }>> = {};
 
     let totalAssignments = 0;
@@ -330,6 +332,8 @@ export async function GET(request: NextRequest) {
         dueDate: assignment.dueDate.toISOString(),
         marksObtained,
         maxMarks: assignment.maxMarks,
+        assignmentFileUrl: assignment.attachmentUrl ?? null,
+        assignmentFileName: assignment.attachmentOriginalName ?? null,
       });
 
       totalAssignments++;

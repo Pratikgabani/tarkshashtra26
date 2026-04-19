@@ -58,6 +58,9 @@ export interface TeacherAssignment {
   description: string;
   dueDate: string;
   maxMarks: number;
+  attachmentUrl: string | null;
+  attachmentOriginalName: string | null;
+  attachmentMimeType: string | null;
 }
 
 export interface TeacherSubmissionRecord {
@@ -269,6 +272,9 @@ export async function buildTeacherBaseData(teacherId: string): Promise<TeacherBa
     description: assignment.description,
     dueDate: toIsoDate(assignment.dueDate),
     maxMarks: assignment.maxMarks,
+    attachmentUrl: assignment.attachmentUrl ?? null,
+    attachmentOriginalName: assignment.attachmentOriginalName ?? null,
+    attachmentMimeType: assignment.attachmentMimeType ?? null,
   }));
 
   const submissions: TeacherSubmissionsMap = {};

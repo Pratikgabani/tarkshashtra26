@@ -8,6 +8,11 @@ export interface IAssignment extends Document {
   subjectId: mongoose.Types.ObjectId;
   dueDate: Date;
   maxMarks: number;
+  attachmentUrl?: string | null;
+  attachmentPublicId?: string | null;
+  attachmentOriginalName?: string | null;
+  attachmentMimeType?: string | null;
+  attachmentSizeBytes?: number | null;
   createdAt: Date;
 }
 
@@ -18,6 +23,11 @@ const AssignmentSchema: Schema<IAssignment> = new Schema(
     subjectId: { type: Schema.Types.ObjectId, ref: "Subject", required: true },
     dueDate: { type: Date, required: true },
     maxMarks: { type: Number, required: true, min: 1 },
+    attachmentUrl: { type: String, trim: true, default: null },
+    attachmentPublicId: { type: String, trim: true, default: null },
+    attachmentOriginalName: { type: String, trim: true, default: null },
+    attachmentMimeType: { type: String, trim: true, default: null },
+    attachmentSizeBytes: { type: Number, default: null },
   },
   { timestamps: true }
 );

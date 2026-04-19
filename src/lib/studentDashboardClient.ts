@@ -48,6 +48,8 @@ export interface StudentAssignmentEntry {
   dueDate: string;
   marksObtained: number | null;
   maxMarks: number;
+  assignmentFileUrl: string | null;
+  assignmentFileName: string | null;
 }
 
 export interface StudentSubjectPerformance {

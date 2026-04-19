@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
 import connectDB from "@/src/lib/DB_Connection";
 import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionAuth";
 import Assignment from "@/src/models/assignment";
@@ -6,10 +7,16 @@ import StudentAssignment from "@/src/models/studentAssignment";
 import Subject from "@/src/models/subject";
 import User from "@/src/models/user";
 import {
+  deleteRawFileFromCloudinary,
+  uploadAssignmentFileToCloudinary,
+} from "@/src/lib/cloudinary";
+import {
   buildTeacherBaseData,
   uiSubmissionStatusToDbStatus,
   type UiSubmissionStatus,
 } from "@/src/lib/teacherBackend";
+
+export const runtime = "nodejs";
 
 interface CreateAssignmentInput {
   teacherId: string;
@@ -19,6 +26,14 @@ interface CreateAssignmentInput {
   dueDate: string;
   maxMarks: number;
 }
+
+const MAX_ASSIGNMENT_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const ALLOWED_ASSIGNMENT_FILE_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+const ALLOWED_ASSIGNMENT_FILE_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
 
 interface SubmissionRowUpdateInput {
   assignmentId: string;
@@ -49,6 +64,13 @@ function isSubmissionStatus(value: string): value is UiSubmissionStatus {
 
 function isLikelyObjectId(value: string): boolean {
   return /^[a-fA-F0-9]{24}$/.test(value);
+}
+
+function isAllowedAssignmentFile(file: File): boolean {
+  const fileExtension = path.extname(file.name).toLowerCase();
+  const hasAllowedExtension = ALLOWED_ASSIGNMENT_FILE_EXTENSIONS.has(fileExtension);
+  const hasAllowedMimeType = ALLOWED_ASSIGNMENT_FILE_MIME_TYPES.has(file.type);
+  return hasAllowedExtension || hasAllowedMimeType;
 }
 
 async function hasTeacherAccessToSubject(teacherId: string, subjectId: string): Promise<boolean> {
@@ -120,26 +142,87 @@ export async function GET(request: NextRequest) {
  * Body: CreateAssignmentInput
  */
 export async function POST(request: NextRequest) {
+  let uploadedAttachmentPublicId: string | null = null;
+
   try {
     await connectDB();
 
     const auth = requireRoleSession(request, "teacher");
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json()) as Partial<CreateAssignmentInput>;
+    const contentType = request.headers.get("content-type") || "";
 
-    const scopedTeacherId = resolveScopedUserId(auth.session.sub, body.teacherId);
+    let teacherIdInput: string | undefined;
+    let titleInput: string | undefined;
+    let descriptionInput: string | undefined;
+    let subjectIdInput: string | undefined;
+    let dueDateInput: string | undefined;
+    let maxMarksInput: number | undefined;
+    let assignmentFile: File | null = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+
+      teacherIdInput = typeof formData.get("teacherId") === "string"
+        ? String(formData.get("teacherId"))
+        : undefined;
+      titleInput = typeof formData.get("title") === "string"
+        ? String(formData.get("title"))
+        : undefined;
+      descriptionInput = typeof formData.get("description") === "string"
+        ? String(formData.get("description"))
+        : undefined;
+      subjectIdInput = typeof formData.get("subjectId") === "string"
+        ? String(formData.get("subjectId"))
+        : undefined;
+      dueDateInput = typeof formData.get("dueDate") === "string"
+        ? String(formData.get("dueDate"))
+        : undefined;
+
+      const maxMarksValue = formData.get("maxMarks");
+      if (typeof maxMarksValue === "string" && maxMarksValue.trim() !== "") {
+        const parsed = Number(maxMarksValue);
+        if (!Number.isNaN(parsed)) {
+          maxMarksInput = parsed;
+        }
+      }
+
+      const fileValue = formData.get("assignmentFile");
+      assignmentFile = fileValue instanceof File && fileValue.size > 0 ? fileValue : null;
+    } else {
+      const body = (await request.json()) as Partial<CreateAssignmentInput>;
+      teacherIdInput = body.teacherId;
+      titleInput = body.title;
+      descriptionInput = body.description;
+      subjectIdInput = body.subjectId;
+      dueDateInput = body.dueDate;
+      maxMarksInput = typeof body.maxMarks === "number" ? body.maxMarks : undefined;
+    }
+
+    const scopedTeacherId = resolveScopedUserId(auth.session.sub, teacherIdInput);
     if (!scopedTeacherId.ok) return scopedTeacherId.response;
     const teacherId = scopedTeacherId.userId;
 
-    if (!body.title || !body.subjectId || !body.dueDate || typeof body.maxMarks !== "number") {
+    if (!titleInput || !subjectIdInput || !dueDateInput || typeof maxMarksInput !== "number") {
       return NextResponse.json(
         { success: false, message: "teacherId, title, subjectId, dueDate and maxMarks are required" },
         { status: 400 }
       );
     }
 
-    const hasAccess = await hasTeacherAccessToSubject(teacherId, body.subjectId);
+    const normalizedTitle = titleInput.trim();
+    const normalizedDescription = (descriptionInput || "").trim();
+    const normalizedSubjectId = subjectIdInput.trim();
+    const normalizedDueDate = dueDateInput.trim();
+
+    if (!normalizedTitle || !normalizedSubjectId || !normalizedDueDate) {
+      return NextResponse.json(
+        { success: false, message: "title, subjectId and dueDate cannot be blank" },
+        { status: 400 }
+      );
+    }
+
+    const hasAccess = await hasTeacherAccessToSubject(teacherId, normalizedSubjectId);
     if (!hasAccess) {
       return NextResponse.json(
         { success: false, message: "Teacher does not have access to this subject" },
@@ -147,14 +230,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (body.maxMarks < 1 || body.maxMarks > 1000) {
+    if (maxMarksInput < 1 || maxMarksInput > 1000) {
       return NextResponse.json(
         { success: false, message: "maxMarks must be between 1 and 1000" },
         { status: 400 }
       );
     }
 
-    const due = new Date(body.dueDate);
+    const due = new Date(normalizedDueDate);
     if (Number.isNaN(due.getTime())) {
       return NextResponse.json(
         { success: false, message: "Invalid dueDate" },
@@ -162,12 +245,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (assignmentFile) {
+      if (assignmentFile.size > MAX_ASSIGNMENT_FILE_SIZE_BYTES) {
+        return NextResponse.json(
+          { success: false, message: "Assignment file must be 15MB or smaller" },
+          { status: 400 }
+        );
+      }
+
+      if (!isAllowedAssignmentFile(assignmentFile)) {
+        return NextResponse.json(
+          { success: false, message: "Only PDF, DOC, and DOCX files are allowed" },
+          { status: 400 }
+        );
+      }
+    }
+
+    let attachmentData: {
+      attachmentUrl: string;
+      attachmentPublicId: string;
+      attachmentOriginalName: string;
+      attachmentMimeType: string;
+      attachmentSizeBytes: number;
+    } | null = null;
+
+    if (assignmentFile) {
+      const uploadResult = await uploadAssignmentFileToCloudinary({
+        buffer: Buffer.from(await assignmentFile.arrayBuffer()),
+        fileName: assignmentFile.name,
+        mimeType: assignmentFile.type,
+        teacherId,
+      });
+
+      uploadedAttachmentPublicId = uploadResult.publicId;
+
+      attachmentData = {
+        attachmentUrl: uploadResult.secureUrl,
+        attachmentPublicId: uploadResult.publicId,
+        attachmentOriginalName: assignmentFile.name,
+        attachmentMimeType: assignmentFile.type || "application/octet-stream",
+        attachmentSizeBytes: assignmentFile.size,
+      };
+    }
+
     const assignment = await Assignment.create({
-      title: body.title.trim(),
-      description: (body.description || "").trim(),
-      subjectId: body.subjectId,
+      title: normalizedTitle,
+      description: normalizedDescription,
+      subjectId: normalizedSubjectId,
       dueDate: due,
-      maxMarks: body.maxMarks,
+      maxMarks: maxMarksInput,
+      attachmentUrl: attachmentData?.attachmentUrl ?? null,
+      attachmentPublicId: attachmentData?.attachmentPublicId ?? null,
+      attachmentOriginalName: attachmentData?.attachmentOriginalName ?? null,
+      attachmentMimeType: attachmentData?.attachmentMimeType ?? null,
+      attachmentSizeBytes: attachmentData?.attachmentSizeBytes ?? null,
     });
 
     const students = await User.find({ role: "student" }).select("_id").lean();
@@ -193,9 +324,47 @@ export async function POST(request: NextRequest) {
       data: refreshedData,
     });
   } catch (error) {
+    if (uploadedAttachmentPublicId) {
+      await deleteRawFileFromCloudinary(uploadedAttachmentPublicId);
+    }
+
+    if (error instanceof Error && error.message.includes("Missing Cloudinary configuration")) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Assignment upload is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Error && /cloudinary/i.test(error.message)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Cloudinary upload failed: ${error.message}`,
+        },
+        { status: 502 }
+      );
+    }
+
+    if (error instanceof Error && /cast to objectid failed/i.test(error.message)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid subject selected. Please choose a valid subject and try again.",
+        },
+        { status: 400 }
+      );
+    }
+
     console.error("Teacher assignments POST API error:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to create assignment" },
+      {
+        success: false,
+        message: error instanceof Error ? `Failed to create assignment: ${error.message}` : "Failed to create assignment",
+      },
       { status: 500 }
     );
   }

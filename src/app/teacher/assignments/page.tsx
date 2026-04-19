@@ -32,6 +32,9 @@ interface AssignmentsPageData {
     description: string;
     dueDate: string;
     maxMarks: number;
+    attachmentUrl: string | null;
+    attachmentOriginalName: string | null;
+    attachmentMimeType: string | null;
   }>;
   submissions: Record<string, Record<string, {
     status: UiSubmissionStatus;
@@ -48,6 +51,7 @@ interface AssignmentCreateForm {
   subjectId: string;
   dueDate: string;
   maxMarks: number;
+  assignmentFile: File | null;
 }
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -140,6 +144,7 @@ function CreateAssignmentModal({
     subjectId: subjects[0]?.id || '',
     dueDate: '',
     maxMarks: 20,
+    assignmentFile: null,
   });
 
   return (
@@ -171,6 +176,20 @@ function CreateAssignmentModal({
               rows={3}
               placeholder="Assignment description"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Assignment File (PDF/DOC/DOCX)</label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0] || null;
+                setForm((prev) => ({ ...prev, assignmentFile: nextFile }));
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-[11px] text-gray-500">Optional. Max size: 15MB.</p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -580,27 +599,54 @@ export default function TeacherAssignmentsPage() {
     setError('');
 
     try {
+      const payload = new FormData();
+      payload.append('title', form.title);
+      payload.append('description', form.description);
+      payload.append('subjectId', form.subjectId);
+      payload.append('dueDate', form.dueDate);
+      payload.append('maxMarks', String(form.maxMarks));
+
+      if (form.assignmentFile) {
+        payload.append('assignmentFile', form.assignmentFile);
+      }
+
       const response = await fetch('/api/teacher/assignments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: payload,
       });
-      const json = await response.json();
 
-      if (response.ok && json?.success && json?.data) {
-        const payload = json.data as AssignmentsPageData;
+      const responseText = await response.text();
+      let json: unknown = null;
+      try {
+        json = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        json = null;
+      }
+
+      const apiResult = json as {
+        success?: boolean;
+        message?: string;
+        assignmentId?: string;
+        data?: AssignmentsPageData;
+      } | null;
+
+      if (response.ok && apiResult?.success && apiResult?.data) {
+        const payload = apiResult.data as AssignmentsPageData;
         setData(payload);
         setEditableSubmissions(payload.submissions || {});
         setOriginalSubmissions(payload.submissions || {});
         setShowCreateModal(false);
 
-        if (json.assignmentId) {
-          setSelectedAssignmentId(String(json.assignmentId));
+        if (apiResult.assignmentId) {
+          setSelectedAssignmentId(String(apiResult.assignmentId));
         }
 
         setNotice('Assignment created successfully.');
       } else {
-        setError(json?.message || 'Failed to create assignment');
+        const fallbackMessage = responseText && !responseText.trim().startsWith('<')
+          ? responseText
+          : 'Failed to create assignment';
+        setError(apiResult?.message || fallbackMessage);
       }
     } catch {
       setError('Failed to create assignment');
@@ -796,6 +842,16 @@ export default function TeacherAssignmentsPage() {
                       </span>
                       <span>Due: <strong className="text-gray-700">{selectedAssignment.dueDate}</strong></span>
                       <span>Max Marks: <strong className="text-gray-700">{selectedAssignment.maxMarks}</strong></span>
+                      {selectedAssignment.attachmentUrl && (
+                        <a
+                          href={selectedAssignment.attachmentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 font-semibold"
+                        >
+                          View Brief{selectedAssignment.attachmentOriginalName ? ` (${selectedAssignment.attachmentOriginalName})` : ''}
+                        </a>
+                      )}
                     </div>
                   </div>
 

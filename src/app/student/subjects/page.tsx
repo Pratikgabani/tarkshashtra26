@@ -224,6 +224,7 @@ function SubjectsContent() {
                       <tr>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assignment</th>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Brief</th>
                         <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Marks</th>
                       </tr>
                     </thead>
@@ -241,6 +242,20 @@ function SubjectsContent() {
                               <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${statusColor}`}>
                                 {status}
                               </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              {assignment.assignmentFileUrl ? (
+                                <a
+                                  href={assignment.assignmentFileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                                >
+                                  {assignment.assignmentFileName ? 'View File' : 'Open'}
+                                </a>
+                              ) : (
+                                <span className="text-[10px] font-medium text-gray-400">No file</span>
+                              )}
                             </td>
                             <td className="px-4 py-4 text-sm font-black text-right text-gray-900">
                               {assignment.marksObtained ?? '--'}<span className="text-gray-400 font-bold ml-1">/ {assignment.maxMarks}</span>
