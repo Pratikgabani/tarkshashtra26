@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       fullName?: string;
       email?: string;
+      parentEmail?: string;
       password?: string;
       role?: UserRole;
       department?: string;
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       batch?: string;
     };
 
-    const { fullName, email, password, role, department, studentId, semester, batch } = body;
+    const { fullName, email, parentEmail, password, role, department, studentId, semester, batch } = body;
 
     // --- Validation ---
     if (!fullName || !email || !password || !role || !department) {
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedParentEmail = parentEmail?.toLowerCase().trim();
     const normalizedStudentId = studentId?.trim();
     const parsedSemester = semester !== undefined && semester !== null && semester !== ""
       ? Number(semester)
@@ -56,6 +58,23 @@ export async function POST(request: NextRequest) {
     if (role === "student" && !normalizedStudentId) {
       return NextResponse.json(
         { success: false, message: "Student ID is required for students" },
+        { status: 400 }
+      );
+    }
+
+    if (role === "student" && !normalizedParentEmail) {
+      return NextResponse.json(
+        { success: false, message: "Parent email is required for students" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      normalizedParentEmail &&
+      !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(normalizedParentEmail)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Please enter a valid parent email address" },
         { status: 400 }
       );
     }
@@ -112,6 +131,7 @@ export async function POST(request: NextRequest) {
       isEmailVerified: false,
       signupOtpHash: otpHash,
       signupOtpExpiresAt: otpExpiresAt,
+      parentEmail: role === "student" ? normalizedParentEmail : undefined,
       studentId: role === "student" ? normalizedStudentId : undefined,
       semester: role === "student" ? parsedSemester : undefined,
       batch: role === "student" ? batch?.trim() : undefined,
@@ -125,6 +145,7 @@ export async function POST(request: NextRequest) {
       existingUser.isEmailVerified = false;
       existingUser.signupOtpHash = baseUserData.signupOtpHash;
       existingUser.signupOtpExpiresAt = baseUserData.signupOtpExpiresAt;
+      existingUser.parentEmail = baseUserData.parentEmail;
       existingUser.studentId = baseUserData.studentId;
       existingUser.semester = baseUserData.semester;
       existingUser.batch = baseUserData.batch;

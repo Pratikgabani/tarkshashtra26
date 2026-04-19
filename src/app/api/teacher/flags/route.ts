@@ -4,6 +4,8 @@ import { requireRoleSession, resolveScopedUserId } from "@/src/lib/routeSessionA
 import Alert from "@/src/models/alert";
 import User from "@/src/models/user";
 import { buildTeacherBaseData, toIsoDate } from "@/src/lib/teacherBackend";
+import { sendAcademicAlertEmail } from "@/src/lib/mailer";
+import mongoose from "mongoose";
 
 interface TeacherFlagInput {
   teacherId: string;
@@ -97,6 +99,9 @@ export async function POST(request: NextRequest) {
     }
 
     const mentorId = student.assignedMentorId || undefined;
+    const mentor = mentorId && mongoose.Types.ObjectId.isValid(mentorId)
+      ? await User.findById(mentorId).select("_id fullName email role").lean()
+      : null;
 
     const title = `Teacher Flag: ${student.fullName}`;
     const message = note;
@@ -112,6 +117,20 @@ export async function POST(request: NextRequest) {
       status: "unread",
       sentAt: new Date(),
     });
+
+    try {
+      await sendAcademicAlertEmail({
+        recipients: [student.email, student.parentEmail || "", mentor?.email || ""],
+        studentName: student.fullName,
+        studentIdentifier: student.studentId || student._id.toString(),
+        mentorName: mentor?.fullName,
+        title,
+        message,
+        actionPath: alert.actionLink,
+      });
+    } catch (mailError) {
+      console.error("Teacher flag mail notification failed:", mailError);
+    }
 
     const refreshed = await buildTeacherBaseData(teacherId);
 

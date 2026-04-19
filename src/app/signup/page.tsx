@@ -8,6 +8,7 @@ type UserRole = "student" | "mentor" | "teacher" | "coordinator";
 interface FormState {
   fullName: string;
   email: string;
+  parentEmail: string;
   password: string;
   confirmPassword: string;
   role: UserRole | "";
@@ -39,6 +40,7 @@ export default function SignupPage() {
   const [form, setForm] = useState<FormState>({
     fullName: "",
     email: "",
+    parentEmail: "",
     password: "",
     confirmPassword: "",
     role: "",
@@ -102,6 +104,17 @@ export default function SignupPage() {
       setError("Student ID is required");
       return false;
     }
+    if (form.role === "student" && !form.parentEmail.trim()) {
+      setError("Parent email is required");
+      return false;
+    }
+    if (
+      form.role === "student" &&
+      !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(form.parentEmail.trim())
+    ) {
+      setError("Please enter a valid parent email address");
+      return false;
+    }
     return true;
   };
 
@@ -131,6 +144,7 @@ export default function SignupPage() {
     department: form.department,
     ...(form.role === "student" && {
       studentId: form.studentId.trim(),
+      parentEmail: form.parentEmail.toLowerCase().trim(),
       semester: form.semester ? Number(form.semester) : undefined,
       batch: form.batch.trim() || undefined,
     }),
@@ -437,6 +451,19 @@ export default function SignupPage() {
                     value={form.studentId}
                     onChange={(e) => updateField("studentId", e.target.value)}
                     placeholder="e.g. 22CE001"
+                    className="h-11 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-text-primary placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="parentEmail" className="mb-1.5 block text-sm font-medium text-text-primary">
+                    Parent Email <span className="text-error">*</span>
+                  </label>
+                  <input
+                    id="parentEmail"
+                    type="email"
+                    value={form.parentEmail}
+                    onChange={(e) => updateField("parentEmail", e.target.value)}
+                    placeholder="parent@example.com"
                     className="h-11 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-text-primary placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>

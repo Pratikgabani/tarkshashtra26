@@ -41,4 +41,83 @@ export async function sendSignupOtpEmail(to: string, otp: string): Promise<void>
   });
 }
 
+function dedupeValidEmails(emails: string[]): string[] {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const normalized = emails
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => emailRegex.test(value));
+
+  return Array.from(new Set(normalized));
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export interface AcademicAlertEmailInput {
+  recipients: string[];
+  studentName: string;
+  studentIdentifier?: string;
+  mentorName?: string;
+  title: string;
+  message: string;
+  riskLevel?: "low" | "medium" | "high";
+  actionPath?: string;
+}
+
+export async function sendAcademicAlertEmail(input: AcademicAlertEmailInput): Promise<void> {
+  const recipients = dedupeValidEmails(input.recipients);
+  if (recipients.length === 0) {
+    return;
+  }
+
+  const transporter = createTransporter();
+  const actionUrl = input.actionPath
+    ? `${process.env.APP_BASE_URL?.replace(/\/$/, "") || "http://localhost:3000"}${input.actionPath}`
+    : undefined;
+
+  const studentLine = input.studentIdentifier
+    ? `${input.studentName} (${input.studentIdentifier})`
+    : input.studentName;
+
+  const riskLine = input.riskLevel ? `Risk level: ${input.riskLevel.toUpperCase()}` : undefined;
+  const safeTitle = escapeHtml(input.title);
+  const safeStudentLine = escapeHtml(studentLine);
+  const safeMentorName = input.mentorName ? escapeHtml(input.mentorName) : undefined;
+  const safeMessage = escapeHtml(input.message);
+  const safeRiskLine = riskLine ? escapeHtml(riskLine) : undefined;
+
+  await transporter.sendMail({
+    from: `ShikshaSetu<${MAIL_SENDER}>`,
+    to: MAIL_SENDER,
+    bcc: recipients,
+    subject: `[ShikshaSetu Alert] ${input.title}`,
+    text: [
+      input.title,
+      `Student: ${studentLine}`,
+      input.mentorName ? `Faculty mentor: ${input.mentorName}` : undefined,
+      riskLine,
+      `Details: ${input.message}`,
+      actionUrl ? `Action link: ${actionUrl}` : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+        <h2 style="margin: 0 0 12px;">${safeTitle}</h2>
+        <p style="margin: 0 0 8px;"><strong>Student:</strong> ${safeStudentLine}</p>
+        ${safeMentorName ? `<p style="margin: 0 0 8px;"><strong>Faculty Mentor:</strong> ${safeMentorName}</p>` : ""}
+        ${safeRiskLine ? `<p style="margin: 0 0 8px;"><strong>${safeRiskLine}</strong></p>` : ""}
+        <p style="margin: 0 0 16px;">${safeMessage}</p>
+        <p style="margin: 0; color: #6b7280; font-size: 13px;">This message was sent to the student, parent, and assigned faculty mentor.</p>
+      </div>
+    `,
+  });
+}
+
 export { MAIL_SENDER };
