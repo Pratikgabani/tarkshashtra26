@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react';
-import StudentSidebar from '@/src/components/student/StudentSidebar';
+import type { ReactNode } from "react";
+import StudentSidebar from "@/src/components/student/StudentSidebar";
 
 export const metadata = {
-  title: 'Student Portal — EduShield',
-  description: 'Student Performance Dashboard and Analytics',
+  title: "Student Portal — ShikshaSetu",
+  description: "Student Performance Dashboard and Analytics",
 };
 
 export default function StudentLayout({ children }: { children: ReactNode }) {

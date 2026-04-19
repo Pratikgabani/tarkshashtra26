@@ -1,12 +1,16 @@
-import type { ReactNode } from 'react';
-import CoordinatorSidebar from '@/src/components/coordinator/CoordinatorSidebar';
+import type { ReactNode } from "react";
+import CoordinatorSidebar from "@/src/components/coordinator/CoordinatorSidebar";
 
 export const metadata = {
-  title: 'Coordinator Portal — EduShield',
-  description: 'Academic Coordinator Dashboard & Student Risk Analytics',
+  title: "Coordinator Portal — ShikshaSetu",
+  description: "Academic Coordinator Dashboard & Student Risk Analytics",
 };
 
-export default function CoordinatorLayout({ children }: { children: ReactNode }) {
+export default function CoordinatorLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex font-sans">
       <CoordinatorSidebar />

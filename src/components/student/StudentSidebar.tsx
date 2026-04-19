@@ -1,24 +1,30 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { fetchStudentDashboardData } from '@/src/lib/studentDashboardClient';
-import { LayoutDashboard, GraduationCap, LineChart, Bell, User } from 'lucide-react';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { fetchStudentDashboardData } from "@/src/lib/studentDashboardClient";
+import {
+  LayoutDashboard,
+  GraduationCap,
+  LineChart,
+  Bell,
+  User,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: '/student/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/student/subjects', label: 'Subjects', icon: GraduationCap },
-  { href: '/student/analytics', label: 'Analytics', icon: LineChart },
-  { href: '/student/alerts', label: 'Alerts', icon: Bell },
-  { href: '/student/profile', label: 'Profile', icon: User },
+  { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/student/subjects", label: "Subjects", icon: GraduationCap },
+  { href: "/student/analytics", label: "Analytics", icon: LineChart },
+  { href: "/student/alerts", label: "Alerts", icon: Bell },
+  { href: "/student/profile", label: "Profile", icon: User },
 ];
 
 export default function StudentSidebar() {
   const pathname = usePathname();
-  const [studentName, setStudentName] = useState('Student');
-  const [studentId, setStudentId] = useState('');
-  const [batch, setBatch] = useState('');
+  const [studentName, setStudentName] = useState("Student");
+  const [studentId, setStudentId] = useState("");
+  const [batch, setBatch] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
 
   useEffect(() => {
@@ -26,13 +32,14 @@ export default function StudentSidebar() {
       const result = await fetchStudentDashboardData();
       if (!result.ok) return;
 
-      setStudentName(result.data.student.fullName || 'Student');
-      setStudentId(result.data.student.studentId || '');
-      setBatch(result.data.student.batch || '');
+      setStudentName(result.data.student.fullName || "Student");
+      setStudentId(result.data.student.studentId || "");
+      setBatch(result.data.student.batch || "");
       setUnreadAlerts(
-        typeof result.data.unreadAlertCount === 'number'
+        typeof result.data.unreadAlertCount === "number"
           ? result.data.unreadAlertCount
-          : result.data.alerts.filter((alert) => alert.status === 'unread').length
+          : result.data.alerts.filter((alert) => alert.status === "unread")
+              .length,
       );
     }
 
@@ -40,18 +47,24 @@ export default function StudentSidebar() {
   }, []);
 
   const initials = useMemo(
-    () => studentName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
-    [studentName]
+    () =>
+      studentName
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+    [studentName],
   );
 
   const handleSignOut = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch {
       // Best-effort logout: still clear client-side session state.
     } finally {
-      localStorage.removeItem('shikshasetu_user');
-      window.location.href = '/login';
+      localStorage.removeItem("shikshasetu_user");
+      window.location.href = "/login";
     }
   };
 
@@ -63,16 +76,23 @@ export default function StudentSidebar() {
           <GraduationCap className="w-5 h-5 text-white" />
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">EduShield</p>
-          <p className="text-[11px] text-gray-500 font-medium leading-tight">Student Portal</p>
+          <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">
+            ShikshaSetu
+          </p>
+          <p className="text-[11px] text-gray-500 font-medium leading-tight">
+            Student Portal
+          </p>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">Menu</p>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">
+          Menu
+        </p>
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          const isActive =
+            pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
             <Link
@@ -80,13 +100,15 @@ export default function StudentSidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-100/50'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? "bg-blue-50 text-blue-700 shadow-sm shadow-blue-100/50"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+              <Icon
+                className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-gray-400"}`}
+              />
               {item.label}
-              {item.label === 'Alerts' && unreadAlerts > 0 && (
+              {item.label === "Alerts" && unreadAlerts > 0 && (
                 <span className="ml-auto bg-red-100 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   {unreadAlerts}
                 </span>
@@ -100,11 +122,18 @@ export default function StudentSidebar() {
       <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50/50">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 shadow-sm flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-white">{initials || 'ST'}</span>
+            <span className="text-xs font-bold text-white">
+              {initials || "ST"}
+            </span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{studentName}</p>
-            <p className="text-[11px] text-gray-500 truncate">{studentId}{batch ? ` • ${batch}` : ''}</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {studentName}
+            </p>
+            <p className="text-[11px] text-gray-500 truncate">
+              {studentId}
+              {batch ? ` • ${batch}` : ""}
+            </p>
           </div>
         </div>
         <button
