@@ -16,6 +16,113 @@ import { ensureLatestRiskScores } from "@/src/lib/riskScorePredictor";
 
 type SubmissionStatus = "submitted_on_time" | "submitted_late" | "not_submitted";
 
+interface StudentDashboardRiskFactor {
+  factor: string;
+  label: string;
+  currentValue: number;
+  threshold: number;
+  unit: string;
+  weight: number;
+  contribution: number;
+  suggestion: string;
+}
+
+function clampPercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function buildDashboardRiskFactors(metrics: {
+  attendance: number;
+  marks: number;
+  assignmentCompletionRate: number;
+  avgLoginsPerWeek: number;
+  lateSubmissions: number;
+}): StudentDashboardRiskFactor[] {
+  const attendance = clampPercentage(metrics.attendance);
+  const marks = clampPercentage(metrics.marks);
+  const assignmentCompletionRate = clampPercentage(metrics.assignmentCompletionRate);
+  const avgLoginsPerWeek = Number.isFinite(metrics.avgLoginsPerWeek)
+    ? Number(metrics.avgLoginsPerWeek.toFixed(1))
+    : 0;
+  const lmsScore = clampPercentage((avgLoginsPerWeek / 5) * 100);
+  const lateSubmissions = Math.max(0, Math.round(metrics.lateSubmissions));
+
+  const attendanceDeficit = Math.max(0, (75 - attendance) / 75);
+  const marksDeficit = Math.max(0, (40 - marks) / 40);
+  const assignmentDeficit = Math.max(0, (80 - assignmentCompletionRate) / 80);
+  const lmsDeficit = Math.max(0, (60 - lmsScore) / 60);
+  const lateSubmissionDeficit = Math.min(1, lateSubmissions / 5);
+
+  return [
+    {
+      factor: "attendance",
+      label: "Attendance",
+      currentValue: attendance,
+      threshold: 75,
+      unit: "%",
+      weight: 0.3,
+      contribution: Math.round(attendanceDeficit * 30),
+      suggestion:
+        attendance < 75
+          ? "Increase class attendance to at least 75%."
+          : "Attendance is healthy. Keep it consistent.",
+    },
+    {
+      factor: "assessment_marks",
+      label: "Internal Assessment Marks",
+      currentValue: marks,
+      threshold: 40,
+      unit: "%",
+      weight: 0.25,
+      contribution: Math.round(marksDeficit * 25),
+      suggestion:
+        marks < 40
+          ? "Focus on low-scoring subjects and weekly revision."
+          : "Assessment performance is stable.",
+    },
+    {
+      factor: "assignment_completion",
+      label: "Assignment Completion",
+      currentValue: assignmentCompletionRate,
+      threshold: 80,
+      unit: "%",
+      weight: 0.2,
+      contribution: Math.round(assignmentDeficit * 20),
+      suggestion:
+        assignmentCompletionRate < 80
+          ? "Complete pending assignments before upcoming deadlines."
+          : "Assignment completion is strong.",
+    },
+    {
+      factor: "lms_activity",
+      label: "LMS Activity",
+      currentValue: avgLoginsPerWeek,
+      threshold: 3,
+      unit: "logins/week",
+      weight: 0.15,
+      contribution: Math.round(lmsDeficit * 15),
+      suggestion:
+        avgLoginsPerWeek < 3
+          ? "Use LMS more often for resources and announcements."
+          : "LMS engagement is good.",
+    },
+    {
+      factor: "submission_timeliness",
+      label: "Submission Timeliness",
+      currentValue: lateSubmissions,
+      threshold: 2,
+      unit: "late submissions",
+      weight: 0.1,
+      contribution: Math.round(lateSubmissionDeficit * 10),
+      suggestion:
+        lateSubmissions > 2
+          ? "Reduce late submissions by planning work ahead."
+          : "Submission timing is acceptable.",
+    },
+  ].sort((a, b) => b.contribution - a.contribution);
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -239,12 +346,20 @@ export async function GET(request: NextRequest) {
     const weeklyLogins = recentLms.reduce((sum, r) => sum + r.loginCount, 0);
     const avgLoginsPerWeek = Math.round(weeklyLogins * 10) / 10;
 
+    const dashboardRiskFactors = buildDashboardRiskFactors({
+      attendance: overallAttendance,
+      marks: overallMarksPercent,
+      assignmentCompletionRate,
+      avgLoginsPerWeek,
+      lateSubmissions,
+    });
+
     // --- Risk Score ---
     let riskData: {
       studentId: string;
       score: number;
       riskLevel: "low" | "medium" | "high";
-      factors: unknown[];
+      factors: StudentDashboardRiskFactor[];
       calculatedAt: string;
     } | null = null;
 
@@ -259,7 +374,7 @@ export async function GET(request: NextRequest) {
         studentId,
         score: latestPredictedRisk.score,
         riskLevel: latestPredictedRisk.riskLevel,
-        factors: latestPredictedRisk.factors,
+        factors: dashboardRiskFactors,
         calculatedAt: latestPredictedRisk.calculatedAt.toISOString(),
       };
     }
@@ -269,7 +384,7 @@ export async function GET(request: NextRequest) {
         studentId,
         score: 0,
         riskLevel: "low",
-        factors: [],
+        factors: dashboardRiskFactors,
         calculatedAt: new Date().toISOString(),
       };
     }
