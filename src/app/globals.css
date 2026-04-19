@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F9FAFB;
-  --foreground: #111827;
-  --primary: #2563EB;
-  --primary-hover: #1D4ED8;
-  --surface: #FFFFFF;
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
-  --border: #E5E7EB;
-  --error: #DC2626;
-  --success: #16A34A;
+  --background: #f3f5f8;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #dfe5ee;
+  --ring: #bfccdf;
+  --error: #dc2626;
+  --success: #16a34a;
+  --sidebar-width: 16rem;
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
@@ -22,6 +27,7 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-border: var(--border);
+  --color-ring: var(--ring);
   --color-error: var(--error);
   --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
@@ -29,9 +35,15 @@
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(30, 64, 175, 0.05), transparent 26%),
+    radial-gradient(circle at 92% 6%, rgba(14, 165, 233, 0.06), transparent 28%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Smooth focus ring for accessibility */
@@ -56,4 +68,87 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  background: transparent;
+}
+
+.app-main-with-sidebar {
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar-width);
+  border-right: 1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+}
+
+.app-topbar {
+  height: 4.25rem;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: color-mix(in oklab, var(--surface) 86%, #eff6ff 14%);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+}
+
+.app-topbar h1 {
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.app-topbar p {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.app-content {
+  flex: 1;
+  width: 100%;
+  max-width: 88rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  box-shadow: var(--shadow-card);
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 14.5rem;
+  }
+
+  .app-content {
+    padding: 1.25rem;
+  }
+
+  .app-topbar {
+    padding: 0 1rem;
+  }
 }

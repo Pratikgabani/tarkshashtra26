@@ -25,30 +25,33 @@ export default function MentorSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-30 h-screen w-56 border-r border-gray-200 bg-white flex flex-col">
+    <aside className="app-sidebar">
       {/* Brand */}
-      <div className="h-14 px-5 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2563EB]">
+      <div className="h-18 px-5 flex items-center gap-3 border-b border-[#E2E8F0] shrink-0 bg-white/80">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D4ED8] shadow-sm">
           <svg className="h-4.5 w-4.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
           </svg>
         </div>
-        <span className="text-[15px] font-semibold text-[#111827] tracking-tight">ShikshaSetu</span>
+        <div>
+          <p className="text-[15px] font-bold text-[#0F172A] tracking-tight leading-tight">ShikshaSetu</p>
+          <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.18em] leading-tight">Mentor</p>
+        </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">Mentor Panel</p>
+      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748B]">Mentor Panel</p>
         {NAV.map((item) => {
           const active = pathname === item.href || (item.href !== '/mentor/dashboard' && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+              className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[13px] font-semibold transition-all ${
                 active
-                  ? 'bg-[#2563EB]/5 text-[#2563EB]'
-                  : 'text-[#6B7280] hover:bg-gray-50 hover:text-[#111827]'
+                  ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1E3A8A] shadow-[0_1px_2px_rgba(15,23,42,0.06)]'
+                  : 'border-transparent text-[#64748B] hover:border-[#E2E8F0] hover:bg-white hover:text-[#0F172A]'
               }`}
             >
               <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -61,10 +64,10 @@ export default function MentorSidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="p-3 border-t border-gray-100">
+      <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC]/90">
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#6B7280] hover:bg-gray-50 hover:text-[#111827] transition-colors"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-white hover:text-[#0F172A] transition-colors"
         >
           <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />

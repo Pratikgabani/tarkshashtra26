@@ -8,9 +8,9 @@ export const metadata = {
 
 export default function StudentLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex">
+    <div className="app-shell">
       <StudentSidebar />
-      <div className="ml-60 flex-1 flex flex-col min-h-screen max-w-full">
+      <div className="app-main-with-sidebar">
         {children}
       </div>
     </div>

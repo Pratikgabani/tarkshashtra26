@@ -10,7 +10,7 @@ import {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-[72px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-[#6B7280] font-medium mt-0.5">{subtitle}</p>}
@@ -186,7 +186,7 @@ export default function CoordinatorDashboard() {
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-6 lg:col-span-1">
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Risk Distribution</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">Breakdown of student body health</p>
-            <div className="h-[240px]">
+            <div className="h-60">
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
@@ -215,7 +215,7 @@ export default function CoordinatorDashboard() {
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-6 lg:col-span-2">
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Department Comparison</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">At-risk vs Total students by department</p>
-            <div className="h-[240px]">
+            <div className="h-60">
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={deptStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -241,7 +241,7 @@ export default function CoordinatorDashboard() {
               Export Chart
             </button>
           </div>
-          <div className="h-[300px]">
+          <div className="h-75">
              <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -260,3 +260,4 @@ export default function CoordinatorDashboard() {
     </div>
   );
 }
+

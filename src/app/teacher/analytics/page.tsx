@@ -101,7 +101,7 @@ const PIE_COLORS = ['#16A34A', '#CA8A04', '#DC2626'];
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center shrink-0">
+    <div className="app-topbar">
       <div>
         <h1 className="text-sm font-semibold text-gray-900">{title}</h1>
         {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
@@ -421,3 +421,4 @@ export default function TeacherAnalyticsPage() {
     </div>
   );
 }
+

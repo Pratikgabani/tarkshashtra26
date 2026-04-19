@@ -70,7 +70,7 @@ export default function AlertsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
+      <div className="app-topbar">
         <div>
           <h1 className="text-sm font-semibold text-[#111827]">Alerts & Notifications</h1>
           <p className="text-xs text-[#6B7280]">{unreadCount} unread alert{unreadCount !== 1 ? 's' : ''}</p>
@@ -138,3 +138,4 @@ export default function AlertsPage() {
     </div>
   );
 }
+

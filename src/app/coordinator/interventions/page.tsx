@@ -16,7 +16,7 @@ interface InterventionRecord {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-[72px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-[#6B7280] font-medium mt-0.5">{subtitle}</p>}
@@ -176,3 +176,4 @@ export default function InterventionMonitoring() {
     </div>
   );
 }
+

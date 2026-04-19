@@ -69,25 +69,25 @@ export default function StudentSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-gray-200 flex flex-col z-30">
+    <aside className="app-sidebar">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-gray-100 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 px-5 h-18 border-b border-[#E2E8F0] shrink-0 bg-white/80">
+        <div className="w-9 h-9 rounded-xl bg-[#1D4ED8] flex items-center justify-center shrink-0 shadow-sm">
           <GraduationCap className="w-5 h-5 text-white" />
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">
+          <p className="text-[15px] font-bold text-[#0F172A] leading-tight tracking-tight">
             ShikshaSetu
           </p>
-          <p className="text-[11px] text-gray-500 font-medium leading-tight">
-            Student Portal
+          <p className="text-[11px] text-[#64748B] font-semibold leading-tight uppercase tracking-[0.18em]">
+            Student
           </p>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">
+        <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-[0.22em] px-3 mb-2">
           Menu
         </p>
         {NAV_ITEMS.map((item) => {
@@ -98,18 +98,22 @@ export default function StudentSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${
                 isActive
-                  ? "bg-blue-50 text-blue-700 shadow-sm shadow-blue-100/50"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  ? "border-[#BFDBFE] bg-[#EFF6FF] text-[#1E3A8A] shadow-[0_1px_2px_rgba(15,23,42,0.06)]"
+                  : "border-transparent text-[#64748B] hover:border-[#E2E8F0] hover:bg-white hover:text-[#0F172A]"
               }`}
             >
               <Icon
-                className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-gray-400"}`}
+                className={`w-4 h-4 ${
+                  isActive
+                    ? "text-[#1D4ED8]"
+                    : "text-[#64748B] group-hover:text-[#334155]"
+                }`}
               />
               {item.label}
               {item.label === "Alerts" && unreadAlerts > 0 && (
-                <span className="ml-auto bg-red-100 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <span className="ml-auto bg-[#FEE2E2] text-[#DC2626] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#FECACA]">
                   {unreadAlerts}
                 </span>
               )}
@@ -119,18 +123,18 @@ export default function StudentSidebar() {
       </nav>
 
       {/* Student Profile Footer */}
-      <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50/50">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 shadow-sm flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-white">
+      <div className="p-4 border-t border-[#E2E8F0] shrink-0 bg-[#F8FAFC]/90">
+        <div className="flex items-center gap-3 mb-3 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5">
+          <div className="w-9 h-9 rounded-full bg-[#DBEAFE] border border-[#BFDBFE] flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-[#1D4ED8]">
               {initials || "ST"}
             </span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">
+            <p className="text-sm font-semibold text-[#0F172A] truncate">
               {studentName}
             </p>
-            <p className="text-[11px] text-gray-500 truncate">
+            <p className="text-[11px] text-[#64748B] truncate">
               {studentId}
               {batch ? ` • ${batch}` : ""}
             </p>
@@ -139,7 +143,7 @@ export default function StudentSidebar() {
         <button
           type="button"
           onClick={handleSignOut}
-          className="flex items-center justify-center gap-2 w-full py-1.5 rounded-md text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-800 hover:shadow-sm border border-transparent hover:border-gray-200 transition-all duration-200"
+          className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold text-[#475569] border border-[#E2E8F0] hover:bg-white hover:text-[#0F172A] transition-all duration-200"
         >
           Sign Out
         </button>

@@ -6,7 +6,7 @@ import { Mail, BookOpen, GraduationCap, Users } from 'lucide-react';
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-lg font-bold text-gray-900 tracking-tight">{title}</h1>
         {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
@@ -344,3 +344,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

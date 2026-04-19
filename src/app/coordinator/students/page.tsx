@@ -19,7 +19,7 @@ interface StudentRecord {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-[72px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-[#6B7280] font-medium mt-0.5">{subtitle}</p>}
@@ -46,6 +46,7 @@ export default function CoordinatorStudents() {
   const [filterDept, setFilterDept] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
   const [filterRisk, setFilterRisk] = useState('All');
+  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
@@ -106,6 +107,21 @@ export default function CoordinatorStudents() {
     };
   }, [searchTerm, filterDept, filterClass, filterRisk]);
 
+  useEffect(() => {
+    if (!selectedStudent) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedStudent(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [selectedStudent]);
+
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -120,7 +136,7 @@ export default function CoordinatorStudents() {
     <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-hidden">
       <Topbar title="Student Monitoring" subtitle="Search, filter, and review individual student profiles and risk rationales" />
 
-      <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-[1600px]">
+      <main className="flex-1 flex flex-col p-8 overflow-hidden max-w-400">
         {loading && (
           <div className="mb-4 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8]">
             Loading student records...
@@ -134,7 +150,7 @@ export default function CoordinatorStudents() {
         
         {/* Filters Bar */}
         <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-center justify-between shrink-0">
-          <div className="relative flex-1 min-w-[250px] max-w-sm">
+          <div className="relative flex-1 min-w-62.5 max-w-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-[#6B7280]" />
             </div>
@@ -239,13 +255,17 @@ export default function CoordinatorStudents() {
                       <td className="px-5 py-4">
                         <RiskBadge level={s.riskLevel} />
                       </td>
-                      <td className="px-5 py-4 max-w-[200px]">
+                      <td className="px-5 py-4 max-w-50">
                         <p className={`text-[11px] font-medium leading-relaxed ${s.riskLevel === 'Low' ? 'text-[#6B7280]' : 'text-[#111827]'}`}>
                           {s.riskExplanation}
                         </p>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button className="text-[11px] font-bold text-[#2563EB] hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudent(s)}
+                          className="text-[11px] font-bold text-[#2563EB] hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded transition-colors"
+                        >
                           View Details
                         </button>
                       </td>
@@ -261,6 +281,82 @@ export default function CoordinatorStudents() {
         </div>
 
       </main>
+
+      {selectedStudent && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => setSelectedStudent(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] px-6 py-4">
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">Student Details</h2>
+                <p className="text-xs font-medium text-[#6B7280] mt-0.5">
+                  Detailed risk profile for coordinator review
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedStudent(null)}
+                className="rounded-lg border border-[#E5E7EB] px-2.5 py-1.5 text-xs font-semibold text-[#6B7280] hover:bg-[#F9FAFB]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Name</p>
+                  <p className="text-sm font-bold text-[#111827] mt-1">{selectedStudent.name}</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Student ID</p>
+                  <p className="text-sm font-bold text-[#111827] mt-1">{selectedStudent.id}</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Department</p>
+                  <p className="text-sm font-semibold text-[#111827] mt-1">{selectedStudent.department}</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Class / Batch</p>
+                  <p className="text-sm font-semibold text-[#111827] mt-1">{selectedStudent.classBatch}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Attendance</p>
+                  <p className="text-lg font-black text-[#111827] mt-1">{selectedStudent.attendance}%</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Avg Marks</p>
+                  <p className="text-lg font-black text-[#111827] mt-1">{selectedStudent.avgMarks}</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Risk Score</p>
+                  <p className="text-lg font-black text-[#111827] mt-1">{selectedStudent.riskScore}</p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280]">Risk Level</p>
+                  <div className="mt-2">
+                    <RiskBadge level={selectedStudent.riskLevel} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#E5E7EB] p-4">
+                <p className="text-[11px] uppercase tracking-wider font-bold text-[#6B7280] mb-2">Risk Explanation</p>
+                <p className="text-sm text-[#111827] leading-relaxed">{selectedStudent.riskExplanation}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

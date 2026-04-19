@@ -39,7 +39,7 @@ function assignmentStatusLabel(status: string): AssignmentStatus {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-lg font-bold text-gray-900 tracking-tight">{title}</h1>
         {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
@@ -257,7 +257,7 @@ function SubjectsContent() {
             )}
             
             {/* Header / Summary */}
-            <div className="border border-gray-200 rounded-2xl p-6 flex items-center justify-between bg-gradient-to-br from-white to-gray-50 shadow-sm relative overflow-hidden">
+            <div className="border border-gray-200 rounded-2xl p-6 flex items-center justify-between bg-linear-to-br from-white to-gray-50 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
               <div>
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight">{details.name}</h2>
@@ -411,3 +411,4 @@ export default function SubjectsPage() {
     </Suspense>
   );
 }
+

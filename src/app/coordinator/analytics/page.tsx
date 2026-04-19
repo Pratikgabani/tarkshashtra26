@@ -8,7 +8,7 @@ import {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-[72px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="app-topbar">
       <div>
         <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-[#6B7280] font-medium mt-0.5">{subtitle}</p>}
@@ -170,7 +170,7 @@ export default function CoordinatorAnalytics() {
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl shadow-sm p-6">
             <h3 className="text-[15px] font-bold text-[#111827] mb-1">Class-wise Analysis</h3>
             <p className="text-xs text-[#6B7280] font-medium mb-6">At-Risk students by class block</p>
-            <div className="h-[250px]">
+            <div className="h-62.5">
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={classStats} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
@@ -209,3 +209,4 @@ export default function CoordinatorAnalytics() {
     </div>
   );
 }
+

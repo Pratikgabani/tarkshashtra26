@@ -69,7 +69,7 @@ export default function ActionsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center shrink-0">
+      <div className="app-topbar">
         <div>
           <h1 className="text-sm font-semibold text-[#111827]">Actions & Interventions</h1>
           <p className="text-xs text-[#6B7280]">Track all counseling sessions, extra classes, and follow-ups</p>
@@ -160,3 +160,4 @@ export default function ActionsPage() {
     </div>
   );
 }
+
