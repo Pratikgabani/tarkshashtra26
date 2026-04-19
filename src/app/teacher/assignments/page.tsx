@@ -179,10 +179,10 @@ function CreateAssignmentModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Assignment File (PDF/DOC/DOCX)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Assignment File (PDF)</label>
             <input
               type="file"
-              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,application/pdf"
               onChange={(event) => {
                 const nextFile = event.target.files?.[0] || null;
                 setForm((prev) => ({ ...prev, assignmentFile: nextFile }));

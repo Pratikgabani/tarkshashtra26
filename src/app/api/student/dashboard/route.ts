@@ -92,7 +92,7 @@ function buildDashboardRiskFactors(metrics: {
       suggestion:
         assignmentCompletionRate < 80
           ? "Complete pending assignments before upcoming deadlines."
-          : "Assignm ent completion is strong.",
+          : "Assignment completion is strong.",
     },
     {
       factor: "lms_activity",

@@ -30,10 +30,8 @@ interface CreateAssignmentInput {
 const MAX_ASSIGNMENT_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 const ALLOWED_ASSIGNMENT_FILE_MIME_TYPES = new Set([
   "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
-const ALLOWED_ASSIGNMENT_FILE_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
+const ALLOWED_ASSIGNMENT_FILE_EXTENSIONS = new Set([".pdf"]);
 
 interface SubmissionRowUpdateInput {
   assignmentId: string;
@@ -255,7 +253,7 @@ export async function POST(request: NextRequest) {
 
       if (!isAllowedAssignmentFile(assignmentFile)) {
         return NextResponse.json(
-          { success: false, message: "Only PDF, DOC, and DOCX files are allowed" },
+          { success: false, message: "Only PDF files are allowed" },
           { status: 400 }
         );
       }
@@ -333,7 +331,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           message:
-            "Assignment upload is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.",
+            "Assignment upload is not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.",
         },
         { status: 500 }
       );

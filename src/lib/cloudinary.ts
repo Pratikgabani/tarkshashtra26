@@ -6,8 +6,40 @@ const ASSIGNMENT_UPLOAD_FOLDER = "shikshasetu/assignment-briefs";
 
 let isConfigured = false;
 
+function configureFromCloudinaryUrl(): boolean {
+  const cloudinaryUrl = process.env.CLOUDINARY_URL?.trim();
+  if (!cloudinaryUrl) return false;
+
+  try {
+    const parsed = new URL(cloudinaryUrl);
+    const cloudName = parsed.hostname;
+    const apiKey = decodeURIComponent(parsed.username || "");
+    const apiSecret = decodeURIComponent(parsed.password || "");
+
+    if (parsed.protocol !== "cloudinary:" || !cloudName || !apiKey || !apiSecret) {
+      return false;
+    }
+
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ensureConfigured() {
   if (isConfigured) {
+    return;
+  }
+
+  if (configureFromCloudinaryUrl()) {
+    isConfigured = true;
     return;
   }
 
@@ -16,13 +48,13 @@ function ensureConfigured() {
   const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error("Missing Cloudinary configuration. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.");
+    throw new Error("Missing Cloudinary configuration. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.");
   }
 
   cloudinary.config({
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
     secure: true,
   });
 
@@ -41,15 +73,13 @@ function sanitizeFileBaseName(fileName: string): string {
 
 function inferExtension(fileName: string, mimeType?: string): string {
   const extension = path.extname(fileName).toLowerCase();
-  if (extension === ".pdf" || extension === ".doc" || extension === ".docx") {
+  if (extension === ".pdf") {
     return extension;
   }
 
   if (mimeType === "application/pdf") return ".pdf";
-  if (mimeType === "application/msword") return ".doc";
-  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return ".docx";
 
-  return "";
+  return ".pdf";
 }
 
 export interface AssignmentFileUploadInput {

@@ -183,6 +183,45 @@ export default function StudentDashboard() {
     });
   }, [data, referenceDateMs]);
 
+  const assignmentBriefs = useMemo(() => {
+    if (!data) return [] as Array<{
+      assignmentId: string;
+      title: string;
+      subjectName: string;
+      dueDate: string;
+      assignmentFileUrl: string;
+      assignmentFileName: string | null;
+    }>;
+
+    const briefMap = new Map<string, {
+      assignmentId: string;
+      title: string;
+      subjectName: string;
+      dueDate: string;
+      assignmentFileUrl: string;
+      assignmentFileName: string | null;
+    }>();
+
+    for (const subject of data.subjectPerformance) {
+      for (const assignment of subject.assignments) {
+        if (!assignment.assignmentFileUrl) continue;
+
+        briefMap.set(assignment.assignmentId, {
+          assignmentId: assignment.assignmentId,
+          title: assignment.title,
+          subjectName: subject.name,
+          dueDate: assignment.dueDate,
+          assignmentFileUrl: assignment.assignmentFileUrl,
+          assignmentFileName: assignment.assignmentFileName,
+        });
+      }
+    }
+
+    return Array.from(briefMap.values())
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+      .slice(0, 8);
+  }, [data]);
+
   useEffect(() => {
     async function loadData() {
       const result = await fetchStudentDashboardData();
@@ -596,6 +635,34 @@ export default function StudentDashboard() {
                   </div>
                 );
               })}
+
+              <div className="border-t border-gray-100 pt-4">
+                <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Assignment Briefs</h4>
+                {assignmentBriefs.length === 0 ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs font-semibold text-gray-500">
+                    No assignment brief PDF uploaded by teachers yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {assignmentBriefs.map((brief) => (
+                      <div key={brief.assignmentId} className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2">
+                        <p className="text-xs font-bold text-gray-900">{brief.title}</p>
+                        <p className="text-[11px] font-medium text-gray-500 mt-0.5">
+                          {brief.subjectName} • Due {new Date(brief.dueDate).toLocaleDateString('en-GB')}
+                        </p>
+                        <a
+                          href={brief.assignmentFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex rounded border border-blue-200 bg-white px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                        >
+                          {brief.assignmentFileName ? `Open PDF (${brief.assignmentFileName})` : 'Open PDF'}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
