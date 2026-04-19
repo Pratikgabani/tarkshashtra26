@@ -78,7 +78,7 @@ export async function sendAcademicAlertEmail(input: AcademicAlertEmailInput): Pr
 
   const transporter = createTransporter();
   const actionUrl = input.actionPath
-    ? `${process.env.APP_BASE_URL?.replace(/\/$/, "") || "http://localhost:3000"}${input.actionPath}`
+    ? `${process.env.APP_BASE_URL?.replace(/\/$/, "") || "https://tarkshashtra26.vercel.app"}${input.actionPath}`
     : undefined;
 
   const studentLine = input.studentIdentifier
