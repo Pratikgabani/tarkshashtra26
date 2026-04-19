@@ -123,6 +123,24 @@ function buildDashboardRiskFactors(metrics: {
   ].sort((a, b) => b.contribution - a.contribution);
 }
 
+function resolveStudentActionLink(type: string, rawLink?: string): string {
+  const link = (rawLink || "").trim();
+
+  if (link.startsWith("/student/")) {
+    return link;
+  }
+
+  if (type === "teacher_flag" || type === "meeting_request") {
+    return "/student/profile";
+  }
+
+  if (type === "risk_threshold_crossed") {
+    return "/student/dashboard";
+  }
+
+  return "/student/dashboard";
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -496,7 +514,7 @@ export async function GET(request: NextRequest) {
           message: a.message,
           status: a.status,
           sentAt: a.sentAt.toISOString(),
-          actionLink: a.actionLink,
+          actionLink: resolveStudentActionLink(a.type, a.actionLink),
         })),
         unreadAlertCount,
         generatedAt: new Date().toISOString(),

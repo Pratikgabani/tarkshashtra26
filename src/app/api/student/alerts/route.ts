@@ -3,6 +3,24 @@ import connectDB from "@/src/lib/DB_Connection";
 import { getSessionFromRequest } from "@/src/lib/session";
 import Alert from "@/src/models/alert";
 
+function resolveStudentActionLink(type: string, rawLink?: string): string {
+  const link = (rawLink || "").trim();
+
+  if (link.startsWith("/student/")) {
+    return link;
+  }
+
+  if (type === "teacher_flag" || type === "meeting_request") {
+    return "/student/profile";
+  }
+
+  if (type === "risk_threshold_crossed") {
+    return "/student/dashboard";
+  }
+
+  return "/student/dashboard";
+}
+
 /**
  * GET /api/student/alerts
  * PATCH /api/student/alerts  { action: "mark_all_read" }
@@ -44,7 +62,7 @@ export async function GET(request: NextRequest) {
           status: alert.status,
           sentAt: alert.sentAt.toISOString(),
           readAt: alert.readAt ? alert.readAt.toISOString() : null,
-          actionLink: alert.actionLink,
+          actionLink: resolveStudentActionLink(alert.type, alert.actionLink),
         })),
       },
     });
