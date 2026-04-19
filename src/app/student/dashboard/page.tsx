@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   fetchStudentDashboardData,
   formatRelativeDate,
@@ -25,7 +26,17 @@ import { Bell, ChevronRight, TrendingUp, TrendingDown, BookOpen, Clock, AlertTri
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 
 // ─── Reusable Topbar ────────────────────────────────────────────────────────
-function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
+function Topbar({
+  title,
+  subtitle,
+  onOpenAlerts,
+  unreadCount,
+}: {
+  title: string;
+  subtitle?: string;
+  onOpenAlerts: () => void;
+  unreadCount: number;
+}) {
   return (
     <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
       <div>
@@ -33,9 +44,15 @@ function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
         {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
       </div>
       <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-full hover:bg-gray-100 transition-colors bg-gray-50 border border-gray-200">
+        <button
+          type="button"
+          onClick={onOpenAlerts}
+          className="relative p-2 rounded-full hover:bg-gray-100 transition-colors bg-gray-50 border border-gray-200"
+        >
           <Bell className="w-4 h-4 text-gray-500" />
-          <span className="absolute top-1 max-right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
+          )}
         </button>
       </div>
     </div>
@@ -124,6 +141,7 @@ function getSubjectRiskLevel(subject: StudentSubjectPerformance): UiRiskLevel {
 
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function StudentDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -281,6 +299,10 @@ export default function StudentDashboard() {
 
   const subjectPerformance = data.subjectPerformance;
   const topFactors = data.riskScore.factors.slice(0, 5);
+  const unreadAlerts =
+    typeof data.unreadAlertCount === 'number'
+      ? data.unreadAlertCount
+      : data.alerts.filter((alert) => alert.status === 'unread').length;
 
   // SVG Donut metrics
   const score = data.riskScore.score;
@@ -289,7 +311,14 @@ export default function StudentDashboard() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Topbar title="Overview" subtitle={`Review your analytical risk profile and performance.`} />
+      <Topbar
+        title="Overview"
+        subtitle="Review your analytical risk profile and performance."
+        onOpenAlerts={() => {
+          router.push('/student/alerts');
+        }}
+        unreadCount={unreadAlerts}
+      />
 
       <main className="flex-1 p-8 space-y-8 overflow-auto max-w-7xl">
         {error && (
@@ -309,7 +338,7 @@ export default function StudentDashboard() {
           
           {/* Risk Score Hero Card */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 shadow-sm p-8 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 to-indigo-500" />
             
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-6">Current Risk Profile</h2>
             
@@ -373,6 +402,11 @@ export default function StudentDashboard() {
               </div>
 
               <div className="space-y-5">
+                {topFactors.length === 0 && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500">
+                    Risk factor details are being prepared. Please check back in a moment.
+                  </div>
+                )}
                 {topFactors.map((f, i) => {
                   const inverseFactor = f.factor === 'submission_timeliness';
                   const isBad = inverseFactor ? f.currentValue > f.threshold : f.currentValue < f.threshold;
@@ -400,9 +434,9 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ease-out ${isBad ? 'bg-gradient-to-r from-orange-400 to-red-500' : 'bg-emerald-500'}`} 
-                          style={{ width: `${pct}%` }} 
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ease-out ${isBad ? 'bg-linear-to-r from-orange-400 to-red-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${pct}%` }}
                         />
                       </div>
                     </div>
@@ -427,6 +461,11 @@ export default function StudentDashboard() {
             </div>
             
             <div className="grid grid-cols-1 gap-4">
+              {subjectPerformance.length === 0 && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs font-semibold text-gray-500">
+                  Subject performance is not available yet.
+                </div>
+              )}
               {subjectPerformance.map(s => (
                 <Link 
                   href={`/student/subjects?id=${s.subjectId}`} 
@@ -468,7 +507,7 @@ export default function StudentDashboard() {
               </Link>
             </div>
             
-            <div className="flex-1 w-full min-h-[300px]">
+            <div className="flex-1 w-full min-h-75">
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsLineChart data={riskHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -557,6 +596,11 @@ export default function StudentDashboard() {
             </div>
 
             <div className="space-y-3">
+              {data.alerts.length === 0 && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs font-semibold text-gray-500">
+                  No recent alerts.
+                </div>
+              )}
               {data.alerts.slice(0, 3).map(alert => (
                 <div key={alert.id} className={`p-4 rounded-xl border flex gap-3 ${alert.status === 'unread' ? 'bg-blue-50/30 border-blue-100' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="mt-1">

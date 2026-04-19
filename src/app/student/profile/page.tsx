@@ -19,6 +19,12 @@ export default function ProfilePage() {
   const [data, setData] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [requestingMeeting, setRequestingMeeting] = useState(false);
+  const [formFullName, setFormFullName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
 
   useEffect(() => {
     async function loadProfile() {
@@ -26,6 +32,8 @@ export default function ProfilePage() {
       if (result.ok) {
         setData(result.data);
         setError('');
+        setFormFullName(result.data.student.fullName || '');
+        setFormEmail(result.data.student.email || '');
       } else {
         setError(result.message);
       }
@@ -34,6 +42,82 @@ export default function ProfilePage() {
 
     void loadProfile();
   }, []);
+
+  function openEditProfileModal() {
+    if (!data) return;
+    setFormFullName(data.student.fullName || '');
+    setFormEmail(data.student.email || '');
+    setError('');
+    setNotice('');
+    setEditingProfile(true);
+  }
+
+  async function handleSaveProfile() {
+    const nextName = formFullName.trim();
+    const nextEmail = formEmail.trim().toLowerCase();
+
+    if (!nextName || !nextEmail) {
+      setError('Full name and email are required.');
+      return;
+    }
+
+    setSavingProfile(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/student/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: nextName,
+          email: nextEmail,
+        }),
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json?.success) {
+        setError(json?.message || 'Failed to update profile.');
+        return;
+      }
+
+      const refreshed = await fetchStudentDashboardData();
+      if (refreshed.ok) {
+        setData(refreshed.data);
+      }
+
+      setEditingProfile(false);
+      setNotice(json?.message || 'Profile updated successfully.');
+    } catch {
+      setError('Failed to update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleRequestMeeting() {
+    setRequestingMeeting(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/student/mentor-meeting', {
+        method: 'POST',
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json?.success) {
+        setError(json?.message || 'Failed to send meeting request.');
+        return;
+      }
+
+      setNotice(json?.message || 'Meeting request sent.');
+    } catch {
+      setError('Failed to send meeting request.');
+    } finally {
+      setRequestingMeeting(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -82,12 +166,17 @@ export default function ProfilePage() {
             {error}
           </div>
         )}
+        {notice && (
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-xs font-semibold">
+            {notice}
+          </div>
+        )}
         
         {/* Profile Header */}
         <div className="bg-white rounded-2xl border border-gray-200 p-8 flex flex-col md:flex-row items-center md:items-start gap-8 shadow-sm relative overflow-hidden mb-8">
-          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-600 to-indigo-600" />
+          <div className="absolute top-0 left-0 w-full h-24 bg-linear-to-r from-blue-600 to-indigo-600" />
           
-          <div className="w-32 h-32 rounded-full border-4 border-white bg-gradient-to-tr from-gray-100 to-gray-200 shadow-md flex items-center justify-center relative z-10 shrink-0">
+          <div className="w-32 h-32 rounded-full border-4 border-white bg-linear-to-tr from-gray-100 to-gray-200 shadow-md flex items-center justify-center relative z-10 shrink-0">
              <span className="text-3xl font-black text-gray-500">{initials}</span>
           </div>
           
@@ -105,7 +194,11 @@ export default function ProfilePage() {
           </div>
 
           <div className="relative z-10 md:pt-16 self-center md:self-auto">
-            <button className="px-5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition-colors shadow-sm">
+            <button
+              type="button"
+              onClick={openEditProfileModal}
+              className="px-5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 transition-colors shadow-sm"
+            >
               Edit Details
             </button>
           </div>
@@ -153,8 +246,15 @@ export default function ProfilePage() {
                 {data.student.mentor?.email && (
                   <p className="text-xs font-semibold text-gray-500 mb-2">{data.student.mentor.email}</p>
                 )}
-                <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-white border border-indigo-200 shadow-sm px-3 py-1.5 rounded-md transition-colors">
-                  Request Meeting
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleRequestMeeting();
+                  }}
+                  disabled={requestingMeeting || !data.student.mentor}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-white border border-indigo-200 shadow-sm px-3 py-1.5 rounded-md transition-colors disabled:opacity-60"
+                >
+                  {requestingMeeting ? 'Sending...' : 'Request Meeting'}
                 </button>
               </div>
             </div>
@@ -179,6 +279,67 @@ export default function ProfilePage() {
           </section>
 
         </div>
+
+        {editingProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
+              <h3 className="text-base font-bold text-gray-900">Edit Profile Details</h3>
+              <p className="mt-1 text-xs font-medium text-gray-500">
+                Update your display name and email address.
+              </p>
+
+              <div className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Full Name
+                  </span>
+                  <input
+                    type="text"
+                    value={formFullName}
+                    onChange={(event) => setFormFullName(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter full name"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    value={formEmail}
+                    onChange={(event) => setFormEmail(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter email address"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProfile(false);
+                  }}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSaveProfile();
+                  }}
+                  disabled={savingProfile}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
