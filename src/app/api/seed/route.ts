@@ -67,7 +67,7 @@ export async function POST() {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     // Coordinator
-    const coordinator = await User.create({
+    await User.create({
       fullName: "Dr. Hemant Patel",
       email: "230170107155@vgecg.ac.in",
       password: hashedPassword,
