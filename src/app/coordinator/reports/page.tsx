@@ -18,7 +18,7 @@ interface StudentRecord {
 
 function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="h-[72px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+    <div className="coordinator-reports-topbar h-18 bg-[#FFFFFF] border-b border-[#E5E7EB] px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
       <div>
         <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-[#6B7280] font-medium mt-0.5">{subtitle}</p>}
@@ -159,16 +159,15 @@ export default function ReportsPage() {
   };
 
   const handleDownloadPDF = () => {
-    // In a real production app, this would use jspdf or trigger a backend PDF gen.
-    // For this client-side demo, we invoke the browser print layout specifically styled for printing.
+    // We use a print-only stylesheet that isolates and formats the report card.
     window.print();
   };
 
   return (
-    <div className="flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-y-auto">
+    <div className="coordinator-reports-shell flex flex-col flex-1 bg-[#F9FAFB] h-full overflow-y-auto">
       <Topbar title="Generate Reports" subtitle="Export analytical breakdown datasets for local offline review" />
 
-      <main className="flex-1 p-8 max-w-5xl w-full mx-auto space-y-8 print:p-0">
+      <main className="coordinator-reports-main flex-1 p-8 max-w-5xl w-full mx-auto space-y-8 print:p-0">
         {loading && (
           <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-3 text-xs font-semibold text-[#1D4ED8] print:hidden">
             Loading reports data...
@@ -212,16 +211,20 @@ export default function ReportsPage() {
         </div>
 
         {/* Printable View Area */}
-        <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-10 shadow-sm print:border-none print:shadow-none print:p-0">
+        <div
+          id="coordinator-report-print"
+          className="coordinator-report-card bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-10 shadow-sm print:border-none print:shadow-none print:p-0"
+        >
            <div className="border-b border-[#E5E7EB] pb-6 mb-8">
              <h2 className="text-2xl font-black text-[#111827]">Academic Risk Overview Report</h2>
              <p className="text-sm font-semibold text-[#6B7280] mt-1">Generated exactly on {printableDate}</p>
            </div>
 
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+           <div className="coordinator-report-grid grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
              <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Checked</p><p className="text-2xl font-black text-[#111827]">{summary.total}</p></div>
              <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total At-Risk</p><p className="text-2xl font-black text-[#EF4444]">{summary.atRisk}</p></div>
              <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">High-Risk Tier</p><p className="text-2xl font-black text-[#111827]">{summary.riskDist.High}</p></div>
+             <div><p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Medium-Risk Tier</p><p className="text-2xl font-black text-[#111827]">{summary.riskDist.Medium}</p></div>
            </div>
 
            <h3 className="text-sm font-bold text-[#111827] mb-4 uppercase tracking-widest border-b border-[#E5E7EB] pb-2">High Risk Roster (Top 5)</h3>
@@ -235,7 +238,7 @@ export default function ReportsPage() {
              </thead>
              <tbody className="divide-y divide-[#E5E7EB]">
                {topRiskStudents.map(s => (
-                 <tr key={s.id}>
+                 <tr key={s.id} className="coordinator-report-table-row">
                    <td className="py-4">
                      <p className="text-[13px] font-bold text-[#111827]">{s.name}</p>
                      <p className="text-[11px] font-medium text-[#6B7280]">{s.id}</p>
@@ -256,6 +259,58 @@ export default function ReportsPage() {
         </div>
 
       </main>
+
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+
+          aside {
+            display: none !important;
+          }
+
+          .coordinator-layout-main {
+            margin-left: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+          }
+
+          .coordinator-reports-topbar {
+            display: none !important;
+          }
+
+          .coordinator-reports-shell {
+            background: #ffffff !important;
+            overflow: visible !important;
+          }
+
+          .coordinator-reports-main {
+            max-width: none !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          #coordinator-report-print {
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          .coordinator-report-grid {
+            gap: 12px !important;
+          }
+
+          .coordinator-report-table-row {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
     </div>
   );
 }

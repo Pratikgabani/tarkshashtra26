@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -31,6 +32,58 @@ const NAV_ITEMS = [
 
 export default function CoordinatorSidebar() {
   const pathname = usePathname();
+  const [coordinatorProfile, setCoordinatorProfile] = useState({
+    name: "Coordinator",
+    meta: "Coordinator",
+  });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem("shikshasetu_user");
+        if (!raw) return;
+
+        const parsed = JSON.parse(raw) as {
+          fullName?: string;
+          role?: string;
+          department?: string;
+        };
+
+        if (parsed.role !== "coordinator") return;
+
+        const fullName = parsed.fullName?.trim() || "Coordinator";
+        const department = parsed.department?.trim();
+
+        setCoordinatorProfile({
+          name: fullName,
+          meta: department ? `${department} Coordinator` : "Coordinator",
+        });
+      } catch {
+        // Keep fallback values when local session data is unavailable.
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  const coordinatorName = coordinatorProfile.name;
+  const coordinatorMeta = coordinatorProfile.meta;
+
+  const initials = useMemo(() => {
+    const parts = coordinatorName
+      .split(" ")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0) return "CO";
+    return parts
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
+  }, [coordinatorName]);
 
   const handleSignOut = async () => {
     try {
@@ -92,14 +145,14 @@ export default function CoordinatorSidebar() {
       <div className="p-5 border-t border-[#E5E7EB] shrink-0 bg-[#F9FAFB]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-linear-to-tr from-[#2563EB] to-blue-400 flex items-center justify-center shrink-0 shadow-sm border border-blue-600">
-            <span className="text-sm font-bold text-white">AC</span>
+            <span className="text-sm font-bold text-white">{initials}</span>
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-[#111827] truncate">
-              Dr. A. Coordinator
+              {coordinatorName}
             </p>
             <p className="text-xs text-[#6B7280] truncate font-medium">
-              Head of Academics
+              {coordinatorMeta}
             </p>
           </div>
         </div>
